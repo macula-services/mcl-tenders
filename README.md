@@ -62,17 +62,22 @@ milliseconds; there is no boolean. That list is closed and pinned by a test:
 - **No URL.** A reader rebuilds the TED link from the publication number, so a
   link in a payload can never be followed.
 - **Bounded text.** Titles, names and descriptions are cut to a fixed length and
-  stripped of control characters.
+  stripped of control characters (C0, DEL, C1) and bidirectional overrides.
+  Language keys and country codes must be three-letter codes, or they are
+  dropped.
 
 **Who reported it** is the publisher macula verified on delivery, this sensor's
 own node identity. A company node subscribes with the sensors it trusts as its
 sources; the payload names no sender.
 
-**Nothing is lost to a dark mesh.** The sweep moves on to the next day only when
-every notice was reported. A failed publish or a page TED refuses leaves it, and
-the next sweep reports what is still missing, without repeating what already
-went out. A failed sweep doubles the wait before the next one, up to six hours,
-because TED does answer `429` to a burst.
+**Nothing is lost to a dark mesh.** A sweep reads at most a week of notices, and
+moves on only when every one of them was reported. The first failed publish, or
+a page TED refuses, ends the sweep and leaves its days in place; the next sweep
+reports what is still missing, without repeating what already went out. The
+newest day is read once more by the next sweep, in case TED was still adding
+to it. A sensor far behind catches up a week per sweep. A failed sweep doubles
+the wait before the next one, up to six hours, because TED does answer `429` to
+a burst.
 
 It asks the realm for no extra authority and serves no procedure of its own.
 `/health` is green while the sensor runs; TED being down, or a dark mesh, is not

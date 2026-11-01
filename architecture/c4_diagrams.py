@@ -183,8 +183,8 @@ def components():
           ["The one topic and its closed field list, every", "string tagged text and bounded, and report/1,",
            "which answers ok only once the mesh took it."], code=True)
     d.box("b-cmp", 56, 390, 456, 120, "sense_ted_notices", "[gen_server, the sweep]",
-          ["Every MCL_TENDERS_POLL_MS: every notice since its", "since day, page by page in scroll mode, paced,",
-           "cut off past a ceiling, backing off on failure."], code=True)
+          ["Every MCL_TENDERS_POLL_MS: a week of notices from", "its since day, page by page in scroll mode,",
+           "paced; the first failed report ends the sweep."], code=True)
     d.box("b-cmp", 536, 390, 456, 120, "parse_ted_notice", "[Erlang module, pure]",
           ["One Search API notice into one map: type, buyer,", "CPV codes, titles, deadline, value. No contact",
            "field is asked for or read; a bad field is empty."], code=True)
@@ -215,7 +215,7 @@ def components():
            "tune the sweep, the reported window and the first day a fresh sensor reads.",
            "MCL_SERVICE_NAME and MCL_BOX label the boot claim; /health is a Unix socket, not a port."],
           code=True)
-    d.text("t-desc", 64, 1070, "No store: since moves past the newest day read only when every notice of the sweep was reported, so a dark mesh or a page TED")
+    d.text("t-desc", 64, 1070, "No store: since moves only when every notice of the sweep (at most a week) was reported, so a dark mesh or a page TED")
     d.text("t-desc", 64, 1088, "refuses delays a notice and loses none. On restart the sensor starts from today again; a day reported twice is harmless,")
     d.text("t-desc", 64, 1106, "because company nodes deduplicate by publication number.")
     d.legend(1130)

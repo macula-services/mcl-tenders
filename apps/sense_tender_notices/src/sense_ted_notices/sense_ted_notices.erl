@@ -8,12 +8,26 @@
 %%% so a sweep neither misses nor repeats a notice. Before a release appears the
 %%% answer is empty, which costs one request.
 %%%
-%%% `since' moves to the day after the newest day read only when EVERY notice of
-%%% the sweep was reported. A dark mesh or a page TED refuses leaves it, so the
-%%% next sweep reads the same days again and reports what is still missing; the
-%%% notices that did go out sit in the reported window and are not sent twice.
-%%% It holds no store: on a restart `since' starts again from today, and a day
-%%% reported again is harmless, because company nodes deduplicate.
+%%% ONE SWEEP READS AT MOST A WEEK: the days from `since' to six days after it.
+%%% A sensor far behind (a long lookback, a mesh dark for a month) catches up a
+%%% week per sweep instead of asking for more than the page ceiling allows,
+%%% which would end every sweep the same way and never move `since'. A week is
+%%% some 27,000 notices: inside the page ceiling, and inside the reported window,
+%%% so re-reading it after a failure never reports a notice twice.
+%%%
+%%% `since' moves only when EVERY notice of the sweep was reported. A dark mesh
+%%% or a page TED refuses leaves it, so the next sweep reads the same days again
+%%% and reports what is still missing; the notices that did go out sit in the
+%%% reported window and are not sent twice. The first report that fails ends the
+%%% sweep: with the mesh dark, the next one would fail the same way, and waiting
+%%% out a timeout per notice of a 3,800-notice day helps nobody.
+%%%
+%%% Where it moves to: past the week, when the whole week lies before today, as
+%%% those days are complete; otherwise to the newest day read, so that day is
+%%% read once more and what TED had not yet indexed at this sweep is reported by
+%%% the next (the window drops the rest). It holds no store: on a restart
+%%% `since' starts again from today, and a day reported again is harmless,
+%%% because company nodes deduplicate.
 %%%
 %%% IT ASKS FOR ALL OF TED, never for a company's codes or countries: the query
 %%% names a date and nothing else, so TED learns nothing about who uses the
@@ -26,12 +40,13 @@
 -module(sense_ted_notices).
 -behaviour(gen_server).
 
--export([start_link/0, sweep/3, delay/2, first_day/2, positive_int/2]).
+-export([start_link/0, sweep/4, delay/2, first_day/2, positive_int/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(SEARCH_URL, "https://api.ted.europa.eu/v3/notices/search").
 -define(PAGE_SIZE, 250).            %% TED's maximum
--define(MAX_PAGES, 400).            %% 100,000 notices; a release day has some 3,800
+-define(MAX_PAGES, 400).            %% 100,000 notices; a week has some 27,000
+-define(SPAN_DAYS, 7).              %% the days one sweep reads
 -define(PAGE_PAUSE_MS, 500).
 -define(MAX_DELAY_MS, 21600000).    %% 6 hours
 -define(DEFAULT_POLL_MS, 900000).   %% 15 minutes
@@ -66,7 +81,8 @@ handle_call(_Req, _From, St) -> {reply, {error, unknown_call}, St}.
 handle_cast(_Msg, St)        -> {noreply, St}.
 
 handle_info(sweep, #{since := Since, window := W} = St) ->
-    St2 = swept(sweep(Since, W, live()), St),
+    {Today, _Time} = calendar:universal_time(),
+    St2 = swept(sweep(Since, Today, W, live()), St),
     erlang:send_after(delay(maps:get(poll_ms, St2), maps:get(failures, St2)), self(), sweep),
     {noreply, St2};
 handle_info(_Info, St) ->
@@ -87,19 +103,22 @@ swept({error, Reason, W}, #{since := Since, failures := F} = St) ->
 %% One sweep
 %%------------------------------------------------------------------------------
 
-%% @doc Read every notice published on or after `Since' and report each one
-%% not in `Window'. Answers the day the next sweep starts from, or why this one
-%% stopped; the window it answers holds every notice that did go out.
--spec sweep(day(), reported_window:window(), deps()) ->
+%% @doc Read every notice published from `Since' to six days after it, and
+%% report each one not in `Window'. Answers the day the next sweep starts from,
+%% or why this one stopped; the window it answers holds every notice that did
+%% go out.
+-spec sweep(day(), day(), reported_window:window(), deps()) ->
           {ok, day(), reported_window:window(), stats()} |
           {error, term(), reported_window:window()}.
-sweep(Since, Window, Deps) ->
-    Acc = #{since => Since, window => Window, newest => none,
-            reported => 0, already_reported => 0, skipped => 0, failed => 0},
-    page(request(Since), 1, Acc, Deps).
+sweep(Since, Today, Window, Deps) ->
+    Last = calendar:gregorian_days_to_date(calendar:date_to_gregorian_days(Since) + ?SPAN_DAYS - 1),
+    Acc = #{since => Since, last => Last, today => Today, window => Window, newest => none,
+            reported => 0, already_reported => 0, skipped => 0},
+    page(request(Since, Last), 1, Acc, Deps).
 
-request(Since) ->
-    #{<<"query">> => <<"publication-date>=", (day(Since))/binary>>,
+request(Since, Last) ->
+    #{<<"query">> => <<"publication-date>=", (day(Since))/binary,
+                       " AND publication-date<=", (day(Last))/binary>>,
       <<"fields">> => parse_ted_notice:fields(),
       <<"limit">> => ?PAGE_SIZE,
       <<"scope">> => <<"ALL">>,
@@ -114,8 +133,8 @@ answered({ok, #{<<"notices">> := []}}, _Body, _N, Acc, _Deps) ->
     finished(Acc);
 answered({ok, #{<<"notices">> := Notices} = Reply}, Body, N, Acc, #{report := Report} = Deps)
   when is_list(Notices) ->
-    Acc2 = lists:foldl(fun(Json, A) -> ingest(Json, A, Report) end, Acc, Notices),
-    next(maps:get(<<"iterationNextToken">>, Reply, <<>>), Body, N, Acc2, Deps);
+    ingested(ingest_all(Notices, Acc, Report), maps:get(<<"iterationNextToken">>, Reply, <<>>),
+             Body, N, Deps);
 answered({ok, Other}, _Body, _N, #{window := W}, _Deps) when is_map(Other) ->
     {error, {unexpected_answer, maps:keys(Other)}, W};
 answered({ok, _NotAMap}, _Body, _N, #{window := W}, _Deps) ->
@@ -130,39 +149,51 @@ next(Token, Body, N, Acc, #{pause := Pause} = Deps) when is_binary(Token), Token
 next(_NoToken, _Body, _N, Acc, _Deps) ->
     finished(Acc).
 
-finished(#{failed := 0, window := W} = Acc) ->
-    {ok, next_since(Acc), W, maps:with([reported, already_reported, skipped], Acc)};
-finished(#{failed := Failed, window := W}) ->
-    {error, {unreported, Failed}, W}.
+ingested({ok, Acc}, Token, Body, N, Deps) -> next(Token, Body, N, Acc, Deps);
+ingested({error, _Reason, _W} = Stopped, _Token, _Body, _N, _Deps) -> Stopped.
 
-%% The day after the newest day read; an empty sweep leaves it.
+finished(#{window := W} = Acc) ->
+    {ok, next_since(Acc), W, maps:with([reported, already_reported, skipped], Acc)}.
+
+%% A week wholly before today is complete: the next sweep starts after it.
+%% Otherwise the newest day read is read again, as TED may still be adding to
+%% it; an empty sweep leaves `since'.
+next_since(#{last := Last, today := Today}) when Last < Today ->
+    calendar:gregorian_days_to_date(calendar:date_to_gregorian_days(Last) + 1);
 next_since(#{since := Since, newest := none}) -> Since;
-next_since(#{since := Since, newest := Newest}) ->
-    calendar:gregorian_days_to_date(max(calendar:date_to_gregorian_days(Since), Newest + 1)).
+next_since(#{since := Since, last := Last, newest := Newest}) ->
+    Days = min(max(calendar:date_to_gregorian_days(Since), Newest), calendar:date_to_gregorian_days(Last)),
+    calendar:gregorian_days_to_date(Days).
+
+ingest_all([], Acc, _Report) -> {ok, Acc};
+ingest_all([Json | Rest], Acc, Report) -> continued(ingest(Json, Acc, Report), Rest, Report).
+
+continued({ok, Acc}, Rest, Report) -> ingest_all(Rest, Acc, Report);
+continued({error, _Reason, _W} = Stopped, _Rest, _Report) -> Stopped.
 
 ingest(Json, Acc, Report) when is_map(Json) ->
     parsed(parse_ted_notice:parse(Json), newest(parse_ted_notice:publication_day(Json), Acc), Report);
 ingest(_NotAnObject, #{skipped := S} = Acc, _Report) ->
-    Acc#{skipped := S + 1}.
+    {ok, Acc#{skipped := S + 1}}.
 
 newest(none, Acc) -> Acc;
 newest(Day, #{newest := none} = Acc) -> Acc#{newest := calendar:date_to_gregorian_days(Day)};
 newest(Day, #{newest := N} = Acc) -> Acc#{newest := max(N, calendar:date_to_gregorian_days(Day))}.
 
 parsed({skip, _Why}, #{skipped := S} = Acc, _Report) ->
-    Acc#{skipped := S + 1};
+    {ok, Acc#{skipped := S + 1}};
 parsed({ok, #{publication_number := Number} = Notice}, #{window := W} = Acc, Report) ->
     reported(reported_window:seen(Number, W), Notice, Acc, Report).
 
 reported(true, _Notice, #{already_reported := A} = Acc, _Report) ->
-    Acc#{already_reported := A + 1};
+    {ok, Acc#{already_reported := A + 1}};
 reported(false, Notice, Acc, Report) ->
     marked(Report(Notice), Notice, Acc).
 
 marked(ok, #{publication_number := Number}, #{window := W, reported := R} = Acc) ->
-    Acc#{window := reported_window:mark(Number, W), reported := R + 1};
-marked({error, _Reason}, _Notice, #{failed := F} = Acc) ->
-    Acc#{failed := F + 1}.
+    {ok, Acc#{window := reported_window:mark(Number, W), reported := R + 1}};
+marked({error, Reason}, _Notice, #{window := W}) ->
+    {error, {report_failed, Reason}, W}.
 
 %%------------------------------------------------------------------------------
 %% Pacing

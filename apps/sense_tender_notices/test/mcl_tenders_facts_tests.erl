@@ -92,6 +92,22 @@ free_text_carries_no_control_characters_test() ->
     #{description := {text, D}} = mcl_tenders_facts:fact(N),
     ?assertEqual(<<"line one\nline[31m two">>, D).
 
+%% C1 controls are escapes too: U+009B is a one-character CSI, so "\x{9B}2J"
+%% clears a terminal as surely as ESC [ 2J does.
+free_text_carries_no_c1_controls_test() ->
+    N = (notice())#{buyer_name => <<"Buyer\x{9B}2J\x{85}\x{80}\x{9F} Ltd"/utf8>>},
+    #{buyer_name := {text, B}} = mcl_tenders_facts:fact(N),
+    ?assertEqual(<<"Buyer2J Ltd">>, B).
+
+%% Bidirectional marks, overrides and isolates make text read differently from
+%% what it says ("U+202E" turns "exe.txt" around); they are dropped.
+free_text_carries_no_bidi_controls_test() ->
+    Bidi = [16#061C, 16#200E, 16#200F, 16#202A, 16#202B, 16#202C, 16#202D, 16#202E,
+            16#2066, 16#2067, 16#2068, 16#2069],
+    N = (notice())#{titles => #{<<"eng">> => unicode:characters_to_binary(["a", Bidi, "b"])}},
+    #{titles := #{{text, <<"eng">>} := {text, T}}} = mcl_tenders_facts:fact(N),
+    ?assertEqual(<<"ab">>, T).
+
 %% A fact never carries more than a few kilobytes, whatever TED sends.
 a_fact_is_small_test() ->
     Long = binary:copy(<<"x">>, 100000),

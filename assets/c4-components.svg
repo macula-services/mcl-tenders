@@ -76,9 +76,9 @@
 <rect class="b-cmp" x="56" y="390" width="456" height="120" rx="10"/>
 <text class="t-code" x="72" y="418">sense_ted_notices</text>
 <text class="t-type" x="72" y="436">[gen_server, the sweep]</text>
-<text class="t-desc" x="72" y="460">Every MCL_TENDERS_POLL_MS: every notice since its</text>
-<text class="t-desc" x="72" y="476">since day, page by page in scroll mode, paced,</text>
-<text class="t-desc" x="72" y="492">cut off past a ceiling, backing off on failure.</text>
+<text class="t-desc" x="72" y="460">Every MCL_TENDERS_POLL_MS: a week of notices from</text>
+<text class="t-desc" x="72" y="476">its since day, page by page in scroll mode,</text>
+<text class="t-desc" x="72" y="492">paced; the first failed report ends the sweep.</text>
 <rect class="b-cmp" x="536" y="390" width="456" height="120" rx="10"/>
 <text class="t-code" x="552" y="418">parse_ted_notice</text>
 <text class="t-type" x="552" y="436">[Erlang module, pure]</text>
@@ -134,7 +134,7 @@
 <text class="t-desc" x="80" y="986">MACULA_STATION_NODE_IDS is the pinned dial. MCL_TENDERS_POLL_MS, MCL_TENDERS_MAX_SEEN and MCL_TENDERS_LOOKBACK_DAYS</text>
 <text class="t-desc" x="80" y="1002">tune the sweep, the reported window and the first day a fresh sensor reads.</text>
 <text class="t-desc" x="80" y="1018">MCL_SERVICE_NAME and MCL_BOX label the boot claim; /health is a Unix socket, not a port.</text>
-<text class="t-desc" x="64" y="1070">No store: since moves past the newest day read only when every notice of the sweep was reported, so a dark mesh or a page TED</text>
+<text class="t-desc" x="64" y="1070">No store: since moves only when every notice of the sweep (at most a week) was reported, so a dark mesh or a page TED</text>
 <text class="t-desc" x="64" y="1088">refuses delays a notice and loses none. On restart the sensor starts from today again; a day reported twice is harmless,</text>
 <text class="t-desc" x="64" y="1106">because company nodes deduplicate by publication number.</text>
 <rect class="b-sys" x="24" y="1130" width="22" height="14" rx="3"/>

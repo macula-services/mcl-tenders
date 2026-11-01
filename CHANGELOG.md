@@ -18,11 +18,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   kept; other forms are skipped and counted. No contact field is asked for.
 - `mcl_tenders_facts`: the one topic and its closed field list, pinned by a
   test. No URL and no contact data; text bounded and stripped of control
-  characters. `report/1` answers `ok` only once the mesh took the fact.
+  characters (C0, DEL, C1) and bidirectional overrides; language keys and
+  country codes pass only as three-letter codes. `report/1` answers `ok` only once the mesh took the fact.
 - `reported_window`: the publication numbers already reported, bounded.
-- A sweep that could not report every notice keeps its day, so a dark mesh or a
-  refused page delays a notice and loses none; a failed sweep backs off, up to
-  six hours.
+- A sweep reads at most a week, so a sensor far behind catches up instead of
+  outgrowing the page ceiling. One that could not report every notice keeps its
+  days, so a dark mesh or a refused page delays a notice and loses none; the
+  first failed report ends it, and a failed sweep backs off, up to six hours.
+  The newest day is read once more by the next sweep.
 - The `mcl_om` service shell, generated from `rebar3 new mcl_service`: org and
   scope `mcl-tenders-sensor`, no procedure of its own, no store; `start/1`
   refuses a realm name that does not hash to `MCL_REALM`.

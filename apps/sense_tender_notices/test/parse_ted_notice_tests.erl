@@ -156,3 +156,47 @@ contact_field(F) ->
 
 with_change(Notice, none) -> Notice;
 with_change(Notice, Change) -> Notice#{<<"change-notice-version-identifier">> => Change}.
+
+%%------------------------------------------------------------------------------
+%% Codes and keys are codes (T6): they reach the fact unbounded and unclipped,
+%% so anything that is not a code goes nowhere.
+%%------------------------------------------------------------------------------
+
+-define(HOSTILE, <<(binary:copy(<<"x">>, 200000))/binary, "\e[2J">>).
+
+%% No title in a preferred language, so every title is kept: but only those
+%% keyed by a language.
+a_title_keyed_by_anything_but_a_language_is_dropped_test() ->
+    Titles = #{<<"spa">> => <<"Bien">>, ?HOSTILE => <<"Hostile">>, <<"NLD">> => <<"Upper">>,
+               <<"en">> => <<"Short">>, <<"eng\n">> => <<"Newline">>},
+    ?assertEqual(#{<<"spa">> => <<"Bien">>},
+                 maps:get(titles, parse(?NOTICE(#{<<"notice-title">> => Titles})))).
+
+a_description_language_that_is_not_a_code_is_dropped_test() ->
+    N = parse(?NOTICE(#{<<"description-proc">> => #{?HOSTILE => <<"Hostile">>},
+                        <<"official-language">> => [?HOSTILE]})),
+    ?assertEqual({<<>>, <<>>}, {maps:get(description, N), maps:get(description_lang, N)}).
+
+a_description_keeps_only_its_language_coded_text_test() ->
+    N = parse(?NOTICE(#{<<"description-proc">> => #{?HOSTILE => <<"Hostile">>,
+                                                    <<"nld">> => <<"Goed">>}})),
+    ?assertEqual({<<"Goed">>, <<"nld">>}, {maps:get(description, N), maps:get(description_lang, N)}).
+
+a_buyer_country_that_is_not_a_code_is_dropped_test() ->
+    [?assertEqual(<<>>, maps:get(buyer_country, parse(?NOTICE(#{<<"buyer-country">> => [C]}))))
+     || C <- [?HOSTILE, <<"BEL\n">>, <<"BE">>, <<"BELG">>, <<"B\e2">>]],
+    ?assertEqual(<<"BEL">>, maps:get(buyer_country, parse(?NOTICE(#{<<"buyer-country">> => [<<"bel">>]})))).
+
+a_buyer_name_keyed_by_anything_but_a_language_is_dropped_test() ->
+    N = parse(?NOTICE(#{<<"buyer-name">> => #{?HOSTILE => [<<"Hostile">>]}})),
+    ?assertEqual(<<>>, maps:get(buyer_name, N)).
+
+%% A bare `$' matches before a final newline; no code pattern lets one through.
+a_code_with_a_trailing_newline_is_not_a_code_test() ->
+    N = parse(?NOTICE(#{<<"classification-cpv">> => [<<"72000000\n">>],
+                        <<"estimated-value-cur-proc">> => <<"EUR\n">>,
+                        <<"procedure-identifier">> => <<"abc\n">>})),
+    ?assertEqual({[], <<>>, <<>>},
+                 {maps:get(cpv_codes, N), maps:get(currency, N), maps:get(procedure_id, N)}),
+    ?assertEqual({skip, publication_number},
+                 parse_ted_notice:parse(?NOTICE(#{<<"publication-number">> => <<"745687-2026\n">>}))).

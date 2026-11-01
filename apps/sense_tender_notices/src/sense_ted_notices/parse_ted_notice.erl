@@ -35,6 +35,11 @@
 -define(CPV, "^[0-9]{8}$").
 -define(DECIMAL, "^[0-9]{1,15}(\\.[0-9]{1,4})?$").
 -define(CURRENCY, "^[A-Z]{3}$").
+%% A language as TED keys its text maps ("nld"), and a country as it names one
+%% ("BEL"). Every value that reaches the fact unbounded is held to a code like
+%% these, so a key or a code can never carry text (T6).
+-define(LANGUAGE, "^[a-z]{3}$").
+-define(ANY_CASE_CODE, "^[A-Za-z]{3}$").
 -define(DATE, "^([0-9]{4}-[0-9]{2}-[0-9]{2})(Z|[+-][0-9]{2}:[0-9]{2})?$").
 -define(TIME, "^([0-9]{2}:[0-9]{2}:[0-9]{2})(Z|[+-][0-9]{2}:[0-9]{2})?$").
 
@@ -68,7 +73,7 @@ notice(Type, Json) ->
       procedure_id => only(first(field(<<"procedure-identifier">>, Json)), ?PROCEDURE_ID),
       notice_type => Type,
       buyer_name => in_language(field(<<"buyer-name">>, Json), Langs),
-      buyer_country => string:uppercase(first(field(<<"buyer-country">>, Json))),
+      buyer_country => string:uppercase(only(first(field(<<"buyer-country">>, Json)), ?ANY_CASE_CODE)),
       cpv_codes => cpv_codes(field(<<"classification-cpv">>, Json)),
       titles => titles(field(<<"notice-title">>, Json), Langs),
       description => Description,
@@ -127,14 +132,19 @@ changes(Json) -> first(field(<<"change-notice-version-identifier">>, Json)) =/= 
 %% TED names languages two ways: "NLD" in official-language, "nld" as the key of
 %% a text map. Both become the lower-case form.
 official_languages(Json) ->
-    [string:lowercase(L) || L <- list(field(<<"official-language">>, Json)), is_binary(L)].
+    [string:lowercase(L) || L <- list(field(<<"official-language">>, Json)), matches(L, ?ANY_CASE_CODE)].
+
+%% Only the entries keyed by a language code: a key is copied into the fact as
+%% it stands, so a key that is not a code is dropped with its text.
+by_language(Texts) ->
+    maps:filter(fun(L, _T) -> matches(L, ?LANGUAGE) end, Texts).
 
 %% The title in each language the buyer published in, plus English: TED
 %% machine-translates the label part into all 24, and 24 copies of a title per
 %% notice is not what a company node needs to match on. A notice with none of
 %% those keeps the titles it has.
 titles(Titles, Langs) when is_map(Titles) ->
-    Text = maps:filtermap(fun(_L, T) -> text_of(T) end, Titles),
+    Text = maps:filtermap(fun(_L, T) -> text_of(T) end, by_language(Titles)),
     preferred(maps:with([<<"eng">> | Langs], Text), Text);
 titles(_NotAMap, _Langs) ->
     #{}.
@@ -143,16 +153,26 @@ preferred(Some, _All) when map_size(Some) > 0 -> Some;
 preferred(_None, All) -> All.
 
 %% The buyer's own description, in the language they wrote it in.
-description(Texts, Langs) when is_map(Texts), map_size(Texts) > 0 ->
-    Lang = pick_language(Langs, Texts),
-    {joined(maps:get(Lang, Texts)), Lang};
+description(Texts, Langs) when is_map(Texts) ->
+    described(by_language(Texts), Langs);
 description(_None, _Langs) ->
     {<<>>, <<>>}.
 
-in_language(Texts, Langs) when is_map(Texts), map_size(Texts) > 0 ->
-    first(maps:get(pick_language(Langs, Texts), Texts));
+described(Texts, Langs) when map_size(Texts) > 0 ->
+    Lang = pick_language(Langs, Texts),
+    {joined(maps:get(Lang, Texts)), Lang};
+described(_None, _Langs) ->
+    {<<>>, <<>>}.
+
+in_language(Texts, Langs) when is_map(Texts) ->
+    named_in(by_language(Texts), Langs);
 in_language(Text, _Langs) ->
     first(Text).
+
+named_in(Texts, Langs) when map_size(Texts) > 0 ->
+    first(maps:get(pick_language(Langs, Texts), Texts));
+named_in(_None, _Langs) ->
+    <<>>.
 
 pick_language(Langs, Texts) ->
     hd([L || L <- Langs, maps:is_key(L, Texts)] ++ lists:sort(maps:keys(Texts))).
@@ -236,5 +256,8 @@ only(Value, Pattern) -> kept(matches(Value, Pattern), Value).
 kept(true, Value) -> Value;
 kept(false, _Value) -> <<>>.
 
-matches(Value, Pattern) when is_binary(Value) -> re:run(Value, Pattern, [{capture, none}]) =:= match;
+%% dollar_endonly: a bare `$' also matches before a final newline, which would
+%% let "BEL\n" pass for a code.
+matches(Value, Pattern) when is_binary(Value) ->
+    re:run(Value, Pattern, [dollar_endonly, {capture, none}]) =:= match;
 matches(_NotText, _Pattern) -> false.

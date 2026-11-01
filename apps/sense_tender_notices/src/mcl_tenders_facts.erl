@@ -121,11 +121,15 @@ field(Key, Notice) -> binary(maps:get(Key, Notice, <<>>)).
 
 text(Bin) -> {text, Bin}.
 
-%% Line breaks stay; every other control character goes, so a terminal escape
-%% in a buyer's text never reaches a reader's screen. Then bounded, by
-%% graphemes, so multibyte text is never cut mid-character.
+%% Line breaks stay; every other control character goes, C0, DEL and C1 (U+009B
+%% is a one-character CSI), so a terminal escape in a buyer's text never
+%% reaches a reader's screen. So do the bidirectional marks, overrides and
+%% isolates, which make text read differently from what it says. Then bounded,
+%% by graphemes, so multibyte text is never cut mid-character.
 free_text(Bin, Max) ->
-    Clean = re:replace(binary(Bin), <<"[\\x{00}-\\x{08}\\x{0B}\\x{0C}\\x{0E}-\\x{1F}\\x{7F}]">>,
+    Clean = re:replace(binary(Bin),
+                       <<"[\\x{00}-\\x{08}\\x{0B}\\x{0C}\\x{0E}-\\x{1F}\\x{7F}-\\x{9F}"
+                         "\\x{061C}\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2066}-\\x{2069}]">>,
                        <<>>, [global, unicode, {return, binary}]),
     text(clip(Clean, string:length(Clean), Max)).
 

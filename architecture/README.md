@@ -35,7 +35,8 @@ What the sensor deliberately does not learn or leak:
   fact carries no URL: the company node rebuilds the TED link from the publication
   number, so a link in a payload can never be followed.
 - **Notice text is data (T6).** Titles, names and descriptions are bounded and
-  stripped of control characters, because they reach a company's agent.
+  stripped of control characters and bidirectional overrides, because they reach
+  a company's agent. Language keys and country codes pass only as codes.
 
 ## Level 2: containers and components
 
@@ -47,16 +48,19 @@ What the sensor deliberately does not learn or leak:
 | `mcl_tenders_sensor_service` | the `mcl_om_service` behaviour | The six callbacks. `start/1` refuses a realm whose tag is not the sha256 of `MCL_REALM_NAME`; scope `mcl-tenders-sensor`, 30 days, no actions and no resources. No procedure of its own; `mcl-om` adds `info` and `get_limits`, both open |
 | `mcl_tenders_sensor_sup` | supervisor, `one_for_one` | One child, `sense_ted_notices`, which owns the sweep, the reported window and the publishing. A crashed sensor restarts from today |
 | `mcl_tenders_facts` | Erlang module | The one topic and its closed field list, every string tagged text and bounded, and `report/1`, which publishes synchronously and answers `ok` only once the mesh took it |
-| `sense_ted_notices` | `gen_server`, the sweep | Every `MCL_TENDERS_POLL_MS`: every notice since its `since` day, in TED's scroll mode, 250 a page, half a second apart, cut off at 400 pages. A failed sweep doubles the wait, up to six hours |
+| `sense_ted_notices` | `gen_server`, the sweep | Every `MCL_TENDERS_POLL_MS`: every notice of the week from its `since` day, in TED's scroll mode, 250 a page, half a second apart, cut off at 400 pages. The first failed report ends the sweep; a failed sweep doubles the wait, up to six hours |
 | `parse_ted_notice` | Erlang module, pure | One Search API notice into one map. Corrections are notices with a change-notice version; forms that are neither a call, a prior information notice nor an award are skipped and counted. A missing or odd field is empty, never a crash |
 | `reported_window` | Erlang module, pure | The publication numbers already reported, bounded (30,000 by default, about eight release days) and rebuilt empty on restart |
 | `mcl_om` | library, `~> 1.6` | `boot/1`: loads the identity key, joins the realm, dials the pinned stations, serves `/health` on a Unix socket. Carries `mcl_om_pubsub:publish/3`, which the fact goes through |
 | macula SDK | library, `~> 18.0`, wire 1.0 | QUIC transport, pubsub over the stations, and the verified publisher every fact's attribution rests on |
 | Host environment | read at boot | `MCL_REALM`, `MCL_REALM_NAME`, `MCL_REALM_KEY`, `MACULA_STATION_SEEDS`, `MACULA_STATION_NODE_IDS`, `MCL_TENDERS_POLL_MS`, `MCL_TENDERS_MAX_SEEN`, `MCL_TENDERS_LOOKBACK_DAYS`, `MCL_SERVICE_NAME`, `MCL_BOX`, `MCL_NODE_NAME`, `MCL_NODE_HOST`, `MCL_COOKIE` |
 
-There is no store. `since` moves past the newest day read only when every notice of
-the sweep was reported, so a dark mesh or a page TED refuses delays a notice and loses
-none; the notices that did go out sit in the reported window and are not sent twice.
+There is no store. A sweep reads at most a week, so a sensor far behind catches up a
+week per sweep and never asks for more than the page ceiling. `since` moves only when
+every notice of the sweep was reported: past the week when the week is wholly before
+today, otherwise to the newest day read, which the next sweep reads once more. A dark
+mesh or a page TED refuses delays a notice and loses none; the notices that did go out
+sit in the reported window and are not sent twice.
 On a restart the sensor starts from today again, and a day reported twice is harmless,
 because company nodes deduplicate by publication number.
 
