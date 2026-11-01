@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1180" role="img" aria-label="mcl-tenders containers">
+<title>mcl-tenders containers</title>
+<style>
+.t-name { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 700; }
+.t-desc { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; }
+.t-rel { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 11.5px; paint-order: stroke; stroke-width: 4px; stroke-linejoin: round; }
+.t-code { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; }
+.t-type { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+.t-bound { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 600; }
+.t-leg { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12px; }
+.edge { fill: none; stroke-width: 1.25; }
+.edge-later { fill: none; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bg { fill: #FFFFFF; }
+.b-sys { fill: #F5E9CC; stroke: #A56F0A; stroke-width: 2; }
+.b-per { fill: #E3EBF2; stroke: #3B5B7A; stroke-width: 1.25; }
+.b-mac { fill: #E6E4EE; stroke: #5E5A78; stroke-width: 1.25; }
+.b-ext { fill: #ECEFED; stroke: #8A9791; stroke-width: 1.25; }
+.b-cmp { fill: #FFFFFF; stroke: #8A9791; stroke-width: 1.25; }
+.b-later { fill: none; stroke: #8A9791; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bound { fill: none; stroke: #B3BDB8; stroke-width: 1; }
+.head { fill: #3B5B7A; }
+.t-name, .t-code { fill: #16201D; }
+.t-type, .t-bound, .t-leg { fill: #66736E; }
+.t-desc { fill: #34413C; }
+.t-rel { fill: #66736E; stroke: #FFFFFF; }
+.edge, .edge-later { stroke: #8A9791; }
+.arrowhead { fill: #8A9791; }
+@media (prefers-color-scheme: dark) {
+.bg { fill: #171F1C; }
+.b-sys { fill: #3A2E13; stroke: #E3AA3C; }
+.b-per { fill: #1D2A36; stroke: #8EB4D8; }
+.b-mac { fill: #26243A; stroke: #A9A4C8; }
+.b-ext { fill: #1C2421; stroke: #7D8B85; }
+.b-cmp { fill: #171F1C; stroke: #7D8B85; }
+.b-later { stroke: #7D8B85; }
+.bound { stroke: #4A5752; }
+.head { fill: #8EB4D8; }
+.t-name, .t-code { fill: #E6ECE9; }
+.t-type, .t-bound, .t-leg { fill: #93A09A; }
+.t-desc { fill: #C3CDC8; }
+.t-rel { fill: #93A09A; stroke: #171F1C; }
+.edge, .edge-later { stroke: #7D8B85; }
+.arrowhead { fill: #7D8B85; }
+}
+</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect class="bg" x="0" y="0" width="1100" height="1180"/>
+<rect class="b-per" x="50" y="30" width="300" height="120" rx="10"/>
+<circle class="head" cx="76" cy="54" r="9"/>
+<text class="t-name" x="94" y="58">Bid team</text>
+<text class="t-type" x="94" y="76">[Person, browser on the LAN]</text>
+<text class="t-desc" x="66" y="100">Sets the profile and works</text>
+<text class="t-desc" x="66" y="116">each tender, signed in</text>
+<rect class="b-ext" x="400" y="30" width="300" height="120" rx="10"/>
+<text class="t-name" x="416" y="58">Company agent</text>
+<text class="t-type" x="416" y="76">[External system, optional]</text>
+<text class="t-desc" x="416" y="100">Holds the tenders role in</text>
+<text class="t-desc" x="416" y="116">the same realm</text>
+<rect class="b-ext" x="750" y="30" width="300" height="120" rx="10"/>
+<text class="t-name" x="766" y="58">TED Search API</text>
+<text class="t-type" x="766" y="76">[External system]</text>
+<text class="t-desc" x="766" y="100">Anonymous Search API v3</text>
+<rect class="bound" x="30" y="190" width="1040" height="640" rx="12"/>
+<text class="t-bound" x="46" y="820">mcl-tenders [one release, on a node of the company's realm]</text>
+<rect class="b-cmp" x="50" y="230" width="300" height="150" rx="10"/>
+<text class="t-code" x="66" y="258">mcl_tenders_admin</text>
+<text class="t-type" x="66" y="276">[OTP app: web UI, cowboy]</text>
+<text class="t-desc" x="66" y="300">LAN only; realm sign-in. A CPV</text>
+<text class="t-desc" x="66" y="316">picker, a country list, keywords,</text>
+<text class="t-desc" x="66" y="332">exclusions; the morning list and</text>
+<text class="t-desc" x="66" y="348">each tender's dossier.</text>
+<rect class="b-cmp" x="400" y="230" width="300" height="150" rx="10"/>
+<text class="t-code" x="416" y="258">query_tenders</text>
+<text class="t-type" x="416" y="276">[OTP app: QRY]</text>
+<text class="t-desc" x="416" y="300">get_tender_profile, get_tenders_page,</text>
+<text class="t-desc" x="416" y="316">get_tender_by_id. Serves the UI</text>
+<text class="t-desc" x="416" y="332">in process, and agents through</text>
+<text class="t-desc" x="416" y="348">sealed procedures, role only.</text>
+<rect class="b-sys" x="750" y="230" width="300" height="150" rx="10"/>
+<text class="t-code" x="766" y="258">sense_tender_notices</text>
+<text class="t-type" x="766" y="276">[OTP app: sensor]</text>
+<text class="t-desc" x="766" y="300">Reads the realm's profile, asks TED</text>
+<text class="t-desc" x="766" y="316">for the day's notices in its CPV</text>
+<text class="t-desc" x="766" y="332">codes and countries, drops exclusions,</text>
+<text class="t-desc" x="766" y="348">reports each new one, sealed.</text>
+<rect class="b-cmp" x="50" y="430" width="300" height="150" rx="10"/>
+<text class="t-code" x="66" y="458">guide_tender_lifecycle</text>
+<text class="t-type" x="66" y="476">[OTP app: CMD, the process]</text>
+<text class="t-desc" x="66" y="500">The profile and each tender's dossier:</text>
+<text class="t-desc" x="66" y="516">spotted, pursued or declined, asked,</text>
+<text class="t-desc" x="66" y="532">submitted, won or lost. Hears the</text>
+<text class="t-desc" x="66" y="548">fact in on_tender_notice_reported_*.</text>
+<rect class="b-cmp" x="400" y="430" width="300" height="150" rx="10"/>
+<text class="t-name" x="416" y="458">Read models</text>
+<text class="t-type" x="416" y="476">[SQLite]</text>
+<text class="t-desc" x="416" y="500">The profile, the tenders page</text>
+<text class="t-desc" x="416" y="516">and each dossier, shaped for</text>
+<text class="t-desc" x="416" y="532">the reads: no joins.</text>
+<rect class="b-mac" x="750" y="430" width="300" height="150" rx="10"/>
+<text class="t-code" x="766" y="458">mcl_om and macula</text>
+<text class="t-type" x="766" y="476">[libraries]</text>
+<text class="t-desc" x="766" y="500">Realm identity, the pinned dial,</text>
+<text class="t-desc" x="766" y="516">sealed calls, and the sealed group:</text>
+<text class="t-desc" x="766" y="532">this node serves its key.</text>
+<rect class="b-cmp" x="50" y="630" width="300" height="150" rx="10"/>
+<text class="t-name" x="66" y="658">Event store</text>
+<text class="t-type" x="66" y="676">[ReckonDB, embedded]</text>
+<text class="t-desc" x="66" y="700">Every event of the process,</text>
+<text class="t-desc" x="66" y="716">on this node's disk: it holds</text>
+<text class="t-desc" x="66" y="732">the bid strategy.</text>
+<rect class="b-cmp" x="400" y="630" width="300" height="150" rx="10"/>
+<text class="t-code" x="416" y="658">project_tenders</text>
+<text class="t-type" x="416" y="676">[OTP app: PRJ]</text>
+<text class="t-desc" x="416" y="700">One projection per event,</text>
+<text class="t-desc" x="416" y="716">event_to_table, writing the</text>
+<text class="t-desc" x="416" y="732">read models.</text>
+<rect class="b-mac" x="50" y="880" width="300" height="120" rx="10"/>
+<text class="t-name" x="66" y="908">macula-realm</text>
+<text class="t-type" x="66" y="926">[Macula infrastructure]</text>
+<text class="t-desc" x="66" y="950">Membership, the tenders role,</text>
+<text class="t-desc" x="66" y="966">the org delegation</text>
+<rect class="b-mac" x="750" y="880" width="300" height="120" rx="10"/>
+<text class="t-name" x="766" y="908">Macula stations</text>
+<text class="t-type" x="766" y="926">[Macula infrastructure]</text>
+<text class="t-desc" x="766" y="950">Carry the sealed fact; never</text>
+<text class="t-desc" x="766" y="966">see a notice</text>
+<path class="edge" d="M200 150V230" marker-end="url(#a)"/>
+<text class="t-rel" x="208" y="176">HTTPS on the LAN</text>
+<path class="edge" d="M550 150V230" marker-end="url(#a)"/>
+<text class="t-rel" x="558" y="176">sealed calls, tenders role</text>
+<path class="edge" d="M900 230V150" marker-end="url(#a)"/>
+<text class="t-rel" x="908" y="176">by date, CPV, country</text>
+<path class="edge" d="M350 330H400" marker-end="url(#a)"/>
+<text class="t-rel" x="375" y="322" text-anchor="middle">reads</text>
+<path class="edge" d="M750 330H700" marker-end="url(#a)"/>
+<text class="t-rel" x="725" y="322" text-anchor="middle">profile</text>
+<path class="edge" d="M200 380V430" marker-end="url(#a)"/>
+<text class="t-rel" x="208" y="410">commands</text>
+<path class="edge" d="M200 580V630" marker-end="url(#a)"/>
+<text class="t-rel" x="208" y="610">appends events</text>
+<path class="edge" d="M350 705H400" marker-end="url(#a)"/>
+<text class="t-rel" x="375" y="697" text-anchor="middle">events</text>
+<path class="edge" d="M550 630V580" marker-end="url(#a)"/>
+<text class="t-rel" x="558" y="624">writes</text>
+<path class="edge" d="M550 380V430" marker-end="url(#a)"/>
+<text class="t-rel" x="558" y="410">reads</text>
+<path class="edge" d="M900 380V430" marker-end="url(#a)"/>
+<text class="t-rel" x="908" y="410">publishes the sealed fact</text>
+<path class="edge" d="M800 580V605H375V505H350" marker-end="url(#a)"/>
+<text class="t-rel" x="790" y="600" text-anchor="end">delivers it, from the realm's sensors only</text>
+<path class="edge" d="M1000 580V880" marker-end="url(#a)"/>
+<text class="t-rel" x="1008" y="730">QUIC</text>
+<path class="edge" d="M900 580V855H200V880" marker-end="url(#a)"/>
+<text class="t-rel" x="560" y="849" text-anchor="middle">trust anchor, role, delegation</text>
+<text class="t-desc" x="50" y="1040">One release, so the profile is read in process and crosses no network. The fact between the sensor and the process goes</text>
+<text class="t-desc" x="50" y="1058">through the mesh, sealed under the realm's group, so the sensor may also run on another node of the realm. Every procedure</text>
+<text class="t-desc" x="50" y="1076">is sealed and admits only the tenders role. The event store and the read models hold the bid strategy: back them up as such.</text>
+<rect class="b-sys" x="24" y="1110" width="22" height="14" rx="3"/>
+<text class="t-leg" x="54" y="1122">In scope</text>
+<rect class="b-per" x="110.8" y="1110" width="22" height="14" rx="3"/>
+<text class="t-leg" x="140.8" y="1122">Person</text>
+<rect class="b-mac" x="184.39999999999998" y="1110" width="22" height="14" rx="3"/>
+<text class="t-leg" x="214.39999999999998" y="1122">Macula infrastructure</text>
+<rect class="b-ext" x="357.0" y="1110" width="22" height="14" rx="3"/>
+<text class="t-leg" x="387.0" y="1122">External system</text>
+<rect class="b-cmp" x="490.0" y="1110" width="22" height="14" rx="3"/>
+<text class="t-leg" x="520.0" y="1122">Container or component</text>
+<rect class="bound" x="669.2" y="1110" width="22" height="14" rx="3"/>
+<text class="t-leg" x="699.2" y="1122">Boundary</text>
+</svg>
