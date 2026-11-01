@@ -44,7 +44,7 @@
 %% fault. The variables it waits on are named in the log, never their values.
 info() ->
     #{name => <<"mcl-tenders">>,
-      version => <<"0.1.0">>,
+      version => <<"0.1.1">>,
       description => <<"Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node">>,
       sealing => sealing(tender_notices_group:missing())}.
 

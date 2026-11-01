@@ -48,6 +48,10 @@ jobs:
       - run: rebar3 lint
       - run: rebar3 eunit
       - run: rebar3 dialyzer
+      # The release the Containerfile builds, assembled here on every change:
+      # relx refuses what eunit and dialyzer never look at (a name registered
+      # by two apps stopped the v0.1.0 image this way, macula-services/mcl-tenders#12).
+      - run: rebar3 as prod release
 
   # scripts/promote_latest.sh, the one step that moves :latest, is only ever run
   # by a release. This runs it on every change, against a registry of its own,
