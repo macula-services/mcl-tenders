@@ -32,9 +32,22 @@
 %%% `since' starts again from today, and a day reported again is harmless,
 %%% because company nodes deduplicate.
 %%%
-%%% IT ASKS FOR ALL OF TED, never for a company's codes or countries: the query
-%%% names a date and nothing else, so TED learns nothing about who uses the
-%%% notices (T3 of the design's threat model).
+%%% IT ASKS FOR THE REALM'S CPV CODES AND COUNTRIES, and nothing else of the
+%%% profile (T3 of the threat model, as amended: Raf's decision, owner the
+%%% realm). Each sweep reads the profile in process (get_tender_profile:find/1),
+%%% and the query names the days, the codes and the countries: never a keyword,
+%%% an exclusion or the description. TED's CPV match is hierarchical, so
+%%% `72000000' brings `72315000' too, and a country is the buyer's
+%%% (`buyer-country'). The codes are checked as codes again before they reach
+%%% the query, whatever the read model holds (T6).
+%%%
+%%% IT STAYS IDLE, ASKING TED NOTHING, while the realm has no profile with at
+%%% least one code and one country, or while the node cannot seal what it would
+%%% report (tender_notices_group:missing/0): the facts are the realm's matches,
+%%% and never travel in the clear. Idle, `since' is held at today less the
+%%% lookback, so a profile set later is read from then and not from the day the
+%%% node first booted. The reason is logged once each time it changes, naming
+%%% variables, never values.
 %%%
 %%% POLITE TO TED. Pages are spaced, a scroll is cut off past a ceiling, and a
 %%% failed sweep doubles the wait before the next one, up to six hours. TED's
@@ -43,7 +56,7 @@
 -module(sense_ted_notices).
 -behaviour(gen_server).
 
--export([start_link/0, sweep/4, delay/2, first_day/2, positive_int/2]).
+-export([start_link/0, sweep/4, interest_in/1, delay/2, first_day/2, positive_int/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(SEARCH_URL, "https://api.ted.europa.eu/v3/notices/search").
@@ -57,10 +70,14 @@
 -define(DEFAULT_LOOKBACK_DAYS, 0).
 -define(FETCH_TIMEOUT, 30000).
 -define(CONNECT_TIMEOUT, 10000).
--define(UA, "mcl-tenders-sensor/0.1 (+https://github.com/macula-services/mcl-tenders)").
+-define(UA, "mcl-tenders/0.1 (+https://github.com/macula-services/mcl-tenders)").
+-define(CPV, "^[0-9]{8}\\z").
+-define(COUNTRY, "^[A-Z]{3}\\z").
 
 -type day() :: calendar:date().
--type deps() :: #{search := fun((map()) -> {ok, map()} | {error, term()}),
+-type interest() :: {ok, [binary()], [binary()]} | {idle, term()}.
+-type deps() :: #{interest := fun(() -> interest()),
+                  search := fun((map()) -> {ok, map()} | {error, term()}),
                   report := fun((parse_ted_notice:notice()) -> ok | {error, term()}),
                   pause := fun(() -> ok)}.
 -type stats() :: #{reported := non_neg_integer(), already_reported := non_neg_integer(),
@@ -74,10 +91,11 @@ init([]) ->
     _ = application:ensure_all_started(ssl),
     {Today, _Time} = calendar:universal_time(),
     PollMs = setting("MCL_TENDERS_POLL_MS", poll_ms, ?DEFAULT_POLL_MS),
-    Since = first_day(Today, lookback_days()),
+    Lookback = lookback_days(),
+    Since = first_day(Today, Lookback),
     logger:info("[tenders] sensor up: TED since ~ts, sweep every ~bs", [day(Since), PollMs div 1000]),
     self() ! sweep,
-    {ok, #{since => Since, poll_ms => PollMs, failures => 0,
+    {ok, #{since => Since, poll_ms => PollMs, failures => 0, lookback => Lookback, idle => none,
            window => reported_window:new(setting("MCL_TENDERS_MAX_SEEN", max_seen, ?DEFAULT_MAX_SEEN))}}.
 
 handle_call(_Req, _From, St) -> {reply, {error, unknown_call}, St}.
@@ -85,13 +103,22 @@ handle_cast(_Msg, St)        -> {noreply, St}.
 
 handle_info(sweep, #{since := Since, window := W} = St) ->
     {Today, _Time} = calendar:universal_time(),
-    St2 = swept(sweep(Since, Today, W, live()), St),
+    St2 = swept(sweep(Since, Today, W, live()), Today, St),
     erlang:send_after(delay(maps:get(poll_ms, St2), maps:get(failures, St2)), self(), sweep),
     {noreply, St2};
 handle_info(_Info, St) ->
     {noreply, St}.
 
 terminate(_Reason, _St) -> ok.
+
+swept({idle, Why, W}, Today, #{lookback := Lookback, idle := Was} = St) ->
+    ok = idle_noted(Why, Was),
+    St#{since := first_day(Today, Lookback), window := W, failures := 0, idle := Why};
+swept(Swept, _Today, St) ->
+    swept(Swept, St#{idle := none}).
+
+idle_noted(Same, Same) -> ok;
+idle_noted(Why, _Was) -> logger:notice("[tenders] sensor idle, TED not asked: ~0p", [Why]).
 
 swept({ok, Next, W, Stats}, #{since := Since} = St) ->
     logger:info("[tenders] swept TED since ~ts: ~b reported, ~b already reported, ~b not reported",
@@ -106,22 +133,30 @@ swept({error, Reason, W}, #{since := Since, failures := F} = St) ->
 %% One sweep
 %%------------------------------------------------------------------------------
 
-%% @doc Read every notice published from `Since' to six days after it, and
-%% report each one not in `Window'. Answers the day the next sweep starts from,
-%% or why this one stopped; the window it answers holds every notice that did
-%% go out.
+%% @doc Read every notice in the realm's CPV codes and countries published from
+%% `Since' to six days after it, and report each one not in `Window'. Answers
+%% the day the next sweep starts from, why this one stopped, or why it did not
+%% ask TED at all; the window it answers holds every notice that did go out.
 -spec sweep(day(), day(), reported_window:window(), deps()) ->
           {ok, day(), reported_window:window(), stats()} |
-          {error, term(), reported_window:window()}.
-sweep(Since, Today, Window, Deps) ->
+          {error, term(), reported_window:window()} |
+          {idle, term(), reported_window:window()}.
+sweep(Since, Today, Window, #{interest := Interest} = Deps) ->
+    interested(Interest(), Since, Today, Window, Deps).
+
+interested({idle, Why}, _Since, _Today, Window, _Deps) ->
+    {idle, Why, Window};
+interested({ok, Cpv, Countries}, Since, Today, Window, Deps) ->
     Last = calendar:gregorian_days_to_date(calendar:date_to_gregorian_days(Since) + ?SPAN_DAYS - 1),
     Acc = #{since => Since, last => Last, today => Today, window => Window, newest => none,
             reported => 0, already_reported => 0, skipped => 0},
-    page(request(Since, Last), 1, Acc, Deps).
+    page(request(Since, Last, Cpv, Countries), 1, Acc, Deps).
 
-request(Since, Last) ->
+request(Since, Last, Cpv, Countries) ->
     #{<<"query">> => <<"publication-date>=", (day(Since))/binary,
-                       " AND publication-date<=", (day(Last))/binary>>,
+                       " AND publication-date<=", (day(Last))/binary,
+                       " AND classification-cpv IN (", (spaced(Cpv))/binary, ")",
+                       " AND buyer-country IN (", (spaced(Countries))/binary, ")">>,
       <<"fields">> => parse_ted_notice:fields(),
       <<"limit">> => ?PAGE_SIZE,
       <<"scope">> => <<"ALL">>,
@@ -217,6 +252,45 @@ delay(PollMs, Failures) ->
 first_day(Today, LookbackDays) ->
     calendar:gregorian_days_to_date(calendar:date_to_gregorian_days(Today) - LookbackDays).
 
+spaced(Codes) -> iolist_to_binary(lists:join(<<" ">>, Codes)).
+
+%%------------------------------------------------------------------------------
+%% What the realm is interested in
+%%------------------------------------------------------------------------------
+
+%% @doc The interest a profile read answers: its CPV codes and countries, each
+%% checked as a code again (anything else is dropped, T6), or why the sensor
+%% stays idle. A profile needs at least one code and one country: a query
+%% without either would ask TED for all of a kind, which is not what the realm
+%% described.
+-spec interest_in({ok, map()} | {error, term()}) -> interest().
+interest_in({ok, #{cpv_codes := Cpv, countries := Countries}}) ->
+    narrowed(codes(Cpv, ?CPV), codes(Countries, ?COUNTRY));
+interest_in({error, not_found}) ->
+    {idle, no_profile};
+interest_in({error, Reason}) ->
+    {idle, {profile_unreadable, Reason}}.
+
+narrowed([], _Countries) -> {idle, no_profile};
+narrowed(_Cpv, []) -> {idle, no_profile};
+narrowed(Cpv, Countries) -> {ok, Cpv, Countries}.
+
+codes(List, Pattern) when is_list(List) ->
+    lists:usort([C || C <- List, is_binary(C), re:run(C, Pattern, [{capture, none}]) =:= match]);
+codes(_NotAList, _Pattern) ->
+    [].
+
+%% Live: the node must be able to seal before TED is asked anything, and then
+%% the realm's own profile, read in process.
+interest() ->
+    ready(tender_notices_group:missing()).
+
+ready([]) -> realm_interest(mcl_om:realm());
+ready(Missing) -> {idle, {sealing_unset, Missing}}.
+
+realm_interest({ok, <<_:256>> = Realm}) -> interest_in(get_tender_profile:find(Realm));
+realm_interest(_NoRealm) -> {idle, no_realm}.
+
 day({Y, M, D}) ->
     iolist_to_binary(io_lib:format("~4..0b~2..0b~2..0b", [Y, M, D])).
 
@@ -225,7 +299,8 @@ day({Y, M, D}) ->
 %%------------------------------------------------------------------------------
 
 live() ->
-    #{search => fun search/1,
+    #{interest => fun interest/0,
+      search => fun search/1,
       report => fun mcl_tenders_facts:report/1,
       pause => fun() -> timer:sleep(?PAGE_PAUSE_MS) end}.
 

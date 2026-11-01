@@ -1,31 +1,35 @@
-%%% @doc The public contract of mcl-tenders: one fact, and nothing else leaves
-%%% the sensor.
+%%% @doc The contract of mcl-tenders' one fact, and nothing else leaves the
+%%% sensor.
 %%%
-%%%   tender_notice_reported_v1   TED published a notice this sensor had not
+%%%   tender_notice_reported_v1   TED published a notice in the realm's CPV
+%%%                               codes and countries that this sensor had not
 %%%                               reported before
 %%%
 %%% The topic is a canonical macula app fact owned by org `mcl-tenders', app
-%%% `tenders', domain `wire': `io.macula/mcl-tenders/tenders/wire/
+%%% `tenders', domain `wire': `<realm name>/mcl-tenders/tenders/wire/
 %%% tender_notice_reported_v1'. The org segment is the schema owner and is fixed
-%%% here, not deploy config. This module is the one schema the sensor and the
-%%% company node both build against, so a change to it is one change to both.
+%%% here, not deploy config. The sensor and guide_tender_lifecycle build against
+%%% this one module, so a change to it is one change to both.
 %%%
-%%% ONE TOPIC FOR EVERY NOTICE (T3 of the design's threat model). Country, CPV
-%%% code and notice type are payload fields a company node filters on. A topic
-%%% per code would tell every station on the path which codes a company
-%%% subscribed to, which is the profile it must keep to itself.
+%%% INSIDE THE REALM, SEALED (T3 of the threat model, as amended). The sensor
+%%% asks TED for the profile's codes and countries, so its facts are the
+%%% realm's matches: every one is sealed under the realm's tenders group
+%%% (tender_notices_group), and the stations see traffic, never a payload.
 %%%
-%%% EVERYTHING MATCHING NEEDS, SO NOBODY ASKS (T3). A company node never sends
-%%% the sensor a follow-up call ("give me notice X"), because that would tell
-%%% the sensor which notices matched. The sensor serves no procedure at all.
+%%% ONE TOPIC FOR EVERY NOTICE. Country, CPV code and notice type are payload
+%%% fields. A topic per code would show every station which codes the realm
+%%% follows; one sealed topic shows them nothing but traffic.
+%%%
+%%% EVERYTHING THE MATCHING NEEDS, SO NOBODY ASKS. The sensor serves no
+%%% procedure: the fact carries what guide_tender_lifecycle matches on.
 %%%
 %%% A CLOSED FIELD LIST (A5, T4). fact/1 reads only fields/0 from the notice:
-%%% no contact data, and no url. The company node rebuilds the TED link from the
-%%% publication number, so a link in a payload can never be followed.
+%%% no contact data, and no url. The TED link is rebuilt from the publication
+%%% number, so a link in a payload can never be followed.
 %%%
 %%% WHO REPORTED IT IS NOT IN THE PAYLOAD. macula delivers every event with the
-%%% publisher its link verified, and a company node subscribes with the sensors
-%%% it trusts as its sources (T4).
+%%% publisher its link verified, and the subscriber names the realm's
+%%% `mcl-tenders' org as its sources (T4).
 %%%
 %%% Every string is `{text, Bin}' (CBOR text), so consumers outside the BEAM get
 %%% strings and not hex, and there is no boolean anywhere.
@@ -43,12 +47,15 @@
 -define(MAX_TITLES, 6).
 -define(MAX_CPV_CODES, 100).
 
-%% @doc Publish one notice and answer how it went. Synchronous, so the sweep
-%% marks a notice reported only once it was: a dark mesh or a refused publish
-%% answers an error, and the next sweep tries the notice again.
+%% @doc Publish one notice, sealed under the realm's tenders group, and answer
+%% how it went. Synchronous, so the sweep marks a notice reported only once it
+%% was: a dark mesh, a refused publish or a key the distributor would not hand
+%% over answers an error, and the next sweep tries the notice again.
 -spec report(parse_ted_notice:notice()) -> ok | {error, term()}.
 report(Notice) ->
-    mcl_om_pubsub:publish(topic(realm_name()), fact(Notice), #{mode => sync}).
+    RealmName = realm_name(),
+    mcl_om_pubsub:publish(topic(RealmName), fact(Notice),
+                          tender_notices_group:publish_opts(RealmName, #{mode => sync})).
 
 -spec topic(binary()) -> binary().
 topic(RealmName) ->

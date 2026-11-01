@@ -72,7 +72,7 @@ health_is_green_test() ->
 %% and requires a sealed call. mcl_tenders_callers_tests runs macula's own gate
 %% on that declaration.
 announces_the_profile_procedures_for_the_tenders_role_only_test() ->
-    Caps = ?SERVICE:capabilities(),
+    Caps = without_org_key(fun ?SERVICE:capabilities/0),
     ?assertEqual([<<"describe_tender_profile">>, <<"get_tender_profile">>],
                  [N || #{name := N} <- Caps]),
     ?assertEqual([required], lists:usort([maps:get(confidential, C, absent) || C <- Caps])),
@@ -88,22 +88,68 @@ identity_spec_has_the_shape_mcl_om_expects_test() ->
     ?assert(is_list(Resources)),
     ?assert(is_integer(Ttl) andalso Ttl > 0).
 
-%% Its procedures are CALLs under the org-wide provider grant; it publishes and
-%% subscribes to nothing, so it asks the realm for no topic authority.
+%% Once the org key id is known, the tenders group's distributor is announced
+%% too: sealed calls only, and the handler decides, since the group a pull
+%% names travels inside the sealed payload where no gate sees it.
+announces_the_group_keys_once_the_org_key_is_known_test() ->
+    Caps = with_env([{"MCL_GROUP_ORG_KEY_ID", lists:duplicate(64, $a)}], fun ?SERVICE:capabilities/0),
+    [GroupKeys] = [C || #{name := <<"group_keys_v1">>} = C <- Caps],
+    ?assertMatch(#{auth := handler_authorizes, confidential := required,
+                   handler := {mcl_tenders_group_keys_pull, []}}, GroupKeys),
+    ?assert(lists:member({behaviour, [macula_response]},
+                         mcl_tenders_group_keys_pull:module_info(attributes))).
+
+%% The setup the group waits on is in /health's info, as a state and never a
+%% value, while the verdict stays green.
+info_says_whether_the_group_is_set_up_test() ->
+    ?assertEqual(unset, without_org_key(fun() -> maps:get(sealing, ?SERVICE:info()) end)),
+    ?assertEqual(set, with_env([{"MCL_GROUP_ORG_KEY_ID", lists:duplicate(64, $a)},
+                                {"MCL_TENDERS_GROUP_UCAN", "a-token"}],
+                               fun() -> maps:get(sealing, ?SERVICE:info()) end)).
+
+without_org_key(Fun) ->
+    with_env([{"MCL_GROUP_ORG_KEY_ID", ""}, {"MCL_TENDERS_GROUP_UCAN", ""}], Fun).
+
+with_env(Vars, Fun) ->
+    Old = [{K, os:getenv(K)} || {K, _} <- Vars],
+    [os:putenv(K, V) || {K, V} <- Vars],
+    try Fun() after [restore(K, V) || {K, V} <- Old] end.
+
+restore(K, false) -> os:unsetenv(K);
+restore(K, V) -> os:putenv(K, V).
+
+%% Its procedures are CALLs under the org-wide provider grant, and its one fact
+%% travels sealed under the tenders group, so it asks the realm for no topic
+%% authority.
 asks_for_no_topic_authority_test() ->
     #{actions := Actions, resources := Resources} = ?SERVICE:identity_spec(),
     ?assertEqual([], Actions),
     ?assertEqual([], Resources).
 
-%% The supervisor starts and stops cleanly on its own, without mcl_om. It has
-%% no children as generated; this asserts the tree is startable, not that it does
-%% any work.
-supervisor_starts_and_stops_test() ->
-    {ok, Pid} = mcl_tenders_sup:start_link(),
-    ?assert(is_process_alive(Pid)),
-    ?assertEqual([], supervisor:which_children(Pid)),
-    unlink(Pid),
-    exit(Pid, shutdown).
+%% The distributor, then the sensor. Without the group's setup the
+%% distributor is not started (`ignore') and the sensor stays idle: started
+%% here without mcl_om, it asks TED nothing and the tree stands.
+supervisor_starts_the_distributor_and_the_sensor_test() ->
+    {ok, {_Flags, Children}} = mcl_tenders_sup:init([]),
+    ?assertEqual([mcl_tenders_group_keys, sense_ted_notices], [maps:get(id, C) || C <- Children]),
+    without_org_key(fun() ->
+        {ok, Pid} = mcl_tenders_sup:start_link(),
+        ?assertMatch([{sense_ted_notices, P, worker, _}, {mcl_tenders_group_keys, undefined, worker, _}]
+                       when is_pid(P), supervisor:which_children(Pid)),
+        unlink(Pid),
+        exit(Pid, shutdown)
+    end).
+
+%% The release takes the realm name from the environment: the fact topic and
+%% the group carry it, and start/1 checks it against the realm tag.
+release_config_names_the_realm_test() ->
+    {ok, Text} = file:read_file(alongside("config/sys.config.src")),
+    Named = re:replace(Text, <<"\"\\$\\{([A-Z_]+)\\}\"">>, <<"\"\\1\"">>, [global]),
+    Substituted = re:replace(Named, <<"\\$\\{[A-Z_]+\\}">>, <<"0">>, [global, {return, list}]),
+    {ok, Tokens, _End} = erl_scan:string(Substituted),
+    {ok, Config} = erl_parse:parse_term(Tokens),
+    Sensor = proplists:get_value(sense_tender_notices, Config, []),
+    ?assertEqual("MCL_REALM_NAME", proplists:get_value(realm_name, Sensor)).
 
 %%==============================================================================
 %% The config the store cannot boot without

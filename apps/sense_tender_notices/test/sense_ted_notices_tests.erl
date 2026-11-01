@@ -2,8 +2,9 @@
 %%% are injected, so every test sees exactly what was asked and what would have
 %%% been reported.
 %%%
-%%% A sweep reads every notice published in the week from its `since' day, page
-%%% by page in TED's scroll mode, and reports each one not reported before.
+%%% A sweep reads every notice in the realm's CPV codes and countries published
+%%% in the week from its `since' day, page by page in TED's scroll mode, and
+%%% reports each one not reported before.
 %%% `since' moves only when every notice of the sweep was reported, so a dark
 %%% mesh or a refused page delays a notice and loses none.
 -module(sense_ted_notices_tests).
@@ -39,7 +40,13 @@ reporting(Result) ->
     Self = self(),
     fun(#{publication_number := Number}) -> Self ! {reported, Number}, Result end.
 
-deps(Search, Report) -> #{search => Search, report => Report, pause => fun() -> ok end}.
+-define(CPV, [<<"48000000">>, <<"72000000">>]).
+-define(COUNTRIES, [<<"BEL">>, <<"NLD">>]).
+
+deps(Search, Report) -> deps(fun() -> {ok, ?CPV, ?COUNTRIES} end, Search, Report).
+
+deps(Interest, Search, Report) ->
+    #{interest => Interest, search => Search, report => Report, pause => fun() -> ok end}.
 
 window() -> reported_window:new(1000).
 
@@ -57,13 +64,19 @@ searched() -> drain(searched, []).
 drain(Tag, Acc) ->
     receive {Tag, X} -> drain(Tag, [X | Acc]) after 0 -> lists:reverse(Acc) end.
 
-%% The query names the week it reads, scroll mode, the closed field list,
-%% and nothing about any company: the sensor reads all of TED.
-the_query_starts_from_since_in_scroll_mode_test() ->
+%% T3: the query names the week it reads, the realm's CPV codes and its
+%% countries, and nothing else of the profile; scroll mode, the closed field
+%% list. These are the only things TED learns from this realm.
+the_query_names_the_week_the_codes_and_the_countries_only_test() ->
     _ = sweep(pages([]), reporting(ok)),
     [Body] = searched(),
-    ?assertEqual(<<"publication-date>=20261028 AND publication-date<=20261103">>,
+    ?assertEqual(<<"publication-date>=20261028 AND publication-date<=20261103"
+                   " AND classification-cpv IN (48000000 72000000)"
+                   " AND buyer-country IN (BEL NLD)">>,
                  maps:get(<<"query">>, Body)),
+    ?assertEqual(lists:sort([<<"query">>, <<"fields">>, <<"limit">>, <<"scope">>,
+                             <<"paginationMode">>]),
+                 lists:sort(maps:keys(Body))),
     ?assertEqual(<<"ITERATION">>, maps:get(<<"paginationMode">>, Body)),
     ?assertEqual(<<"ALL">>, maps:get(<<"scope">>, Body)),
     ?assertEqual(250, maps:get(<<"limit">>, Body)),
@@ -87,7 +100,7 @@ a_complete_sweep_moves_since_to_the_newest_day_test() ->
     P1 = [notice(<<"1-2026">>, <<"2026-10-29">>), notice(<<"2-2026">>, <<"2026-10-28">>)],
     ?assertMatch({ok, {2026, 10, 29}, _, _}, sweep(pages([P1]), reporting(ok))).
 
-%% The second read reports only what is new, and then since moves past that
+%% T15: the second read reports only what is new, and then since moves past that
 %% day: a release day is read twice, not once per sweep until the next release,
 %% because every realm runs a sensor and TED pays for each of them.
 the_newest_day_is_read_once_more_and_then_left_test() ->
@@ -107,8 +120,8 @@ a_sensor_far_behind_catches_up_a_week_per_sweep_test() ->
     ?assertMatch({ok, {2026, 9, 7}, _, #{reported := 1}},
                  sweep(Since, pages([P1]), reporting(ok), window())),
     [Body | _] = searched(),
-    ?assertEqual(<<"publication-date>=20260831 AND publication-date<=20260906">>,
-                 maps:get(<<"query">>, Body)),
+    ?assertMatch({match, _}, re:run(maps:get(<<"query">>, Body),
+                                    <<"^publication-date>=20260831 AND publication-date<=20260906 AND ">>)),
     ?assertMatch({ok, {2026, 9, 7}, _, #{reported := 0}},
                  sweep(Since, pages([]), reporting(ok), window())).
 
@@ -177,6 +190,41 @@ an_unexpected_answer_ends_the_sweep_test() ->
 an_endless_scroll_is_cut_off_test() ->
     Endless = fun(_) -> {ok, page([notice(<<"1-2026">>, <<"2026-10-28">>)], 1)} end,
     ?assertMatch({error, too_many_pages, _}, sweep(Endless, reporting(ok))).
+
+%%------------------------------------------------------------------------------
+%% The realm's interest
+%%------------------------------------------------------------------------------
+
+%% No profile with a code and a country, or no way to seal: TED is not asked.
+an_idle_sensor_asks_ted_nothing_test_() ->
+    [?_assertMatch({idle, Why, _}, idle_sweep(Why))
+     || Why <- [no_profile, {sealing_unset, ["MCL_TENDERS_GROUP_UCAN"]}, no_realm]].
+
+idle_sweep(Why) ->
+    _ = searched(),
+    Search = fun(Body) -> self() ! {searched, Body}, {ok, page([], 1)} end,
+    Result = sense_ted_notices:sweep(?SINCE, ?TODAY, window(),
+                                     deps(fun() -> {idle, Why} end, Search, reporting(ok))),
+    [] = searched(),
+    Result.
+
+%% The profile read answers the codes and countries, each checked as a code
+%% again whatever the read model holds (T6), so nothing but a code reaches the
+%% query; and a profile without a code or a country leaves the sensor idle.
+the_interest_is_the_profile_codes_and_countries_test() ->
+    Profile = fun(Cpv, Countries) ->
+                      {ok, #{cpv_codes => Cpv, countries => Countries, keywords => [<<"secret">>],
+                             exclusions => [<<"also secret">>], description => <<"nope">>}}
+              end,
+    ?assertEqual({ok, [<<"72000000">>], [<<"BEL">>]},
+                 sense_ted_notices:interest_in(Profile([<<"72000000">>, <<"72000000">>,
+                                                        <<"72000000) OR (x">>, 7],
+                                                       [<<"BEL">>, <<"be">>, <<"BEL OR">>]))),
+    ?assertEqual({idle, no_profile}, sense_ted_notices:interest_in(Profile([], [<<"BEL">>]))),
+    ?assertEqual({idle, no_profile}, sense_ted_notices:interest_in(Profile([<<"72000000">>], []))),
+    ?assertEqual({idle, no_profile}, sense_ted_notices:interest_in({error, not_found})),
+    ?assertEqual({idle, {profile_unreadable, store_unavailable}},
+                 sense_ted_notices:interest_in({error, store_unavailable})).
 
 %%------------------------------------------------------------------------------
 %% Pacing

@@ -1,10 +1,10 @@
 {application, sense_tender_notices, [
-    {description, "Gathering: reads new public tender notices from TED and reports each as one mesh fact, tender_notice_reported_v1"},
+    {description, "Gathering: reads new TED notices in the realm's CPV codes and countries and reports each as one sealed fact, tender_notice_reported_v1"},
     {vsn, "0.1.0"},
-    %% A LIBRARY APPLICATION, no `mod'. The sensor release starts its one
-    %% process (sense_ted_notices) under mcl_tenders_sensor_sup; the company
-    %% node's release builds against mcl_tenders_facts, the one schema both
-    %% sides share, and starts nothing from here.
+    %% A LIBRARY APPLICATION, no `mod'. The mcl_tenders release starts its
+    %% one process (sense_ted_notices) under mcl_tenders_sup, after the store
+    %% and the read side are up; guide_tender_lifecycle builds against
+    %% mcl_tenders_facts, the one schema both sides share.
     {registered, [sense_ted_notices]},
     {applications, [
         kernel,
@@ -14,8 +14,12 @@
         inets,
         ssl,
         public_key,
-        %% The fact's topic (macula_topic) and its publish (mcl_om_pubsub).
-        mcl_om
+        %% The fact's topic (macula_topic), its sealed publish (macula:publish/5
+        %% under the realm's tenders group, through mcl_om_pubsub).
+        macula,
+        mcl_om,
+        %% The realm's profile, read in process before each sweep.
+        query_tenders
     ]},
     {env, [
         %% How often TED is swept, in ms. Before a release appears a sweep is

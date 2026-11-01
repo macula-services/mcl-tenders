@@ -122,5 +122,15 @@
         %% test compares the two.
         {store_id,               mcl_tenders_store}
     ]},
+    {sense_tender_notices, [
+        %% The realm NAME the fact topic and the tenders group carry. Checked at
+        %% start: sha256 of it must equal MCL_REALM, or the sensor would report
+        %% where nobody subscribed. The sweep's own tuning (MCL_TENDERS_POLL_MS,
+        %% MCL_TENDERS_MAX_SEEN, MCL_TENDERS_LOOKBACK_DAYS) and the group's
+        %% admission (MCL_TENDERS_GROUP_UCAN, MCL_GROUP_ORG_KEY_ID) are read from
+        %% the environment in code, so an unset one is never a malformed term
+        %% here, and the sensor stays idle without the admission.
+        {realm_name, "${MCL_REALM_NAME}"}
+    ]},
     {kernel, [{logger_level, info}]}
 ].
