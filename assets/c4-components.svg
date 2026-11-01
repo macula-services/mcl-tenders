@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 1170" role="img" aria-label="mcl-tenders sensor components">
+<title>mcl-tenders sensor components</title>
+<style>
+.t-name { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 700; }
+.t-desc { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; }
+.t-rel { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 11.5px; paint-order: stroke; stroke-width: 4px; stroke-linejoin: round; }
+.t-code { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; }
+.t-type { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+.t-bound { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 600; }
+.t-leg { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12px; }
+.edge { fill: none; stroke-width: 1.25; }
+.edge-later { fill: none; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bg { fill: #FFFFFF; }
+.b-sys { fill: #F5E9CC; stroke: #A56F0A; stroke-width: 2; }
+.b-per { fill: #E3EBF2; stroke: #3B5B7A; stroke-width: 1.25; }
+.b-mac { fill: #E6E4EE; stroke: #5E5A78; stroke-width: 1.25; }
+.b-ext { fill: #ECEFED; stroke: #8A9791; stroke-width: 1.25; }
+.b-cmp { fill: #FFFFFF; stroke: #8A9791; stroke-width: 1.25; }
+.b-later { fill: none; stroke: #8A9791; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bound { fill: none; stroke: #B3BDB8; stroke-width: 1; }
+.head { fill: #3B5B7A; }
+.t-name, .t-code { fill: #16201D; }
+.t-type, .t-bound, .t-leg { fill: #66736E; }
+.t-desc { fill: #34413C; }
+.t-rel { fill: #66736E; stroke: #FFFFFF; }
+.edge, .edge-later { stroke: #8A9791; }
+.arrowhead { fill: #8A9791; }
+@media (prefers-color-scheme: dark) {
+.bg { fill: #171F1C; }
+.b-sys { fill: #3A2E13; stroke: #E3AA3C; }
+.b-per { fill: #1D2A36; stroke: #8EB4D8; }
+.b-mac { fill: #26243A; stroke: #A9A4C8; }
+.b-ext { fill: #1C2421; stroke: #7D8B85; }
+.b-cmp { fill: #171F1C; stroke: #7D8B85; }
+.b-later { stroke: #7D8B85; }
+.bound { stroke: #4A5752; }
+.head { fill: #8EB4D8; }
+.t-name, .t-code { fill: #E6ECE9; }
+.t-type, .t-bound, .t-leg { fill: #93A09A; }
+.t-desc { fill: #C3CDC8; }
+.t-rel { fill: #93A09A; stroke: #171F1C; }
+.edge, .edge-later { stroke: #7D8B85; }
+.arrowhead { fill: #7D8B85; }
+}
+</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect class="bg" x="0" y="0" width="1040" height="1170"/>
+<rect class="bound" x="40" y="40" width="968" height="830" rx="12"/>
+<text class="t-bound" x="56" y="62">mcl-tenders-sensor [Container]</text>
+<rect class="b-cmp" x="56" y="70" width="456" height="120" rx="10"/>
+<text class="t-code" x="72" y="98">mcl_tenders_sensor_app</text>
+<text class="t-type" x="72" y="116">[OTP application]</text>
+<text class="t-desc" x="72" y="140">start/2 calls mcl_om:boot(mcl_tenders_sensor_service).</text>
+<text class="t-desc" x="72" y="156">The service exports no store_id/0 or data_dir/0,</text>
+<text class="t-desc" x="72" y="172">so mcl_om starts no reckon-db and no subscription.</text>
+<rect class="b-sys" x="536" y="70" width="456" height="152" rx="10"/>
+<text class="t-code" x="552" y="98">mcl_tenders_sensor_service</text>
+<text class="t-type" x="552" y="116">[:mcl_om_service behaviour]</text>
+<text class="t-desc" x="552" y="140">The six callbacks. start/1 refuses a realm whose</text>
+<text class="t-desc" x="552" y="156">tag is not the sha256 of MCL_REALM_NAME; scope</text>
+<text class="t-desc" x="552" y="172">mcl-tenders-sensor for 30 days. No procedure of</text>
+<text class="t-desc" x="552" y="188">its own; mcl-om adds info and get_limits, both open.</text>
+<text class="t-desc" x="552" y="204">capabilities/0 is the list.</text>
+<rect class="b-cmp" x="56" y="230" width="456" height="120" rx="10"/>
+<text class="t-code" x="72" y="258">mcl_tenders_sensor_sup</text>
+<text class="t-type" x="72" y="276">[supervisor, one_for_one]</text>
+<text class="t-desc" x="72" y="300">One child, sense_ted_notices, which owns the</text>
+<text class="t-desc" x="72" y="316">sweep, the reported window and the publishing.</text>
+<text class="t-desc" x="72" y="332">A crashed sensor is restarted from today.</text>
+<rect class="b-cmp" x="536" y="230" width="456" height="120" rx="10"/>
+<text class="t-code" x="552" y="258">mcl_tenders_facts</text>
+<text class="t-type" x="552" y="276">[Erlang module]</text>
+<text class="t-desc" x="552" y="300">The one topic and its closed field list, every</text>
+<text class="t-desc" x="552" y="316">string tagged text and bounded, and report/1,</text>
+<text class="t-desc" x="552" y="332">which answers ok only once the mesh took it.</text>
+<rect class="b-cmp" x="56" y="390" width="456" height="120" rx="10"/>
+<text class="t-code" x="72" y="418">sense_ted_notices</text>
+<text class="t-type" x="72" y="436">[gen_server, the sweep]</text>
+<text class="t-desc" x="72" y="460">Every MCL_TENDERS_POLL_MS: every notice since its</text>
+<text class="t-desc" x="72" y="476">since day, page by page in scroll mode, paced,</text>
+<text class="t-desc" x="72" y="492">cut off past a ceiling, backing off on failure.</text>
+<rect class="b-cmp" x="536" y="390" width="456" height="120" rx="10"/>
+<text class="t-code" x="552" y="418">parse_ted_notice</text>
+<text class="t-type" x="552" y="436">[Erlang module, pure]</text>
+<text class="t-desc" x="552" y="460">One Search API notice into one map: type, buyer,</text>
+<text class="t-desc" x="552" y="476">CPV codes, titles, deadline, value. No contact</text>
+<text class="t-desc" x="552" y="492">field is asked for or read; a bad field is empty.</text>
+<rect class="b-cmp" x="56" y="550" width="456" height="120" rx="10"/>
+<text class="t-code" x="72" y="578">reported_window</text>
+<text class="t-type" x="72" y="596">[Erlang module, pure]</text>
+<text class="t-desc" x="72" y="620">The publication numbers already reported,</text>
+<text class="t-desc" x="72" y="636">bounded (30,000 by default) and rebuilt empty</text>
+<text class="t-desc" x="72" y="652">on restart; company nodes deduplicate too.</text>
+<rect class="b-ext" x="536" y="550" width="456" height="120" rx="10"/>
+<text class="t-code" x="552" y="578">TED Search API</text>
+<text class="t-type" x="552" y="596">[HTTPS, inets and ssl]</text>
+<text class="t-desc" x="552" y="620">POST /v3/notices/search, anonymous: a date query,</text>
+<text class="t-desc" x="552" y="636">scroll mode, 250 notices a page, a fixed field</text>
+<text class="t-desc" x="552" y="652">list. A 429 doubles the wait, up to six hours.</text>
+<rect class="b-mac" x="56" y="710" width="456" height="120" rx="10"/>
+<text class="t-code" x="72" y="738">mcl_om</text>
+<text class="t-type" x="72" y="756">[library, ~&gt; 1.6]</text>
+<text class="t-desc" x="72" y="780">boot/1: loads the identity key, joins the realm,</text>
+<text class="t-desc" x="72" y="796">dials the pinned stations, serves /health on a</text>
+<text class="t-desc" x="72" y="812">Unix socket, and carries mcl_om_pubsub:publish/3.</text>
+<rect class="b-mac" x="536" y="710" width="456" height="120" rx="10"/>
+<text class="t-code" x="552" y="738">macula SDK</text>
+<text class="t-type" x="552" y="756">[library, ~&gt; 18.0, wire 1.0]</text>
+<text class="t-desc" x="552" y="780">QUIC transport, pubsub over the stations, and</text>
+<text class="t-desc" x="552" y="796">the publisher every link verified, which is</text>
+<text class="t-desc" x="552" y="812">what a fact's attribution rests on.</text>
+<path class="edge" d="M56 130H16V770H56" marker-end="url(#a)"/>
+<text class="t-rel" x="30" y="450" text-anchor="middle" transform="rotate(-90 30 450)">calls mcl_om:boot/1</text>
+<path class="edge" d="M512 130H536" marker-end="url(#a)"/>
+<text class="t-rel" x="524" y="122" text-anchor="middle">boots</text>
+<path class="edge" d="M536 160H520V210H284V230" marker-end="url(#a)"/>
+<text class="t-rel" x="300" y="206">starts</text>
+<path class="edge" d="M200 350V390" marker-end="url(#a)"/>
+<text class="t-rel" x="208" y="374">one child</text>
+<path class="edge" d="M512 450H536" marker-end="url(#a)"/>
+<text class="t-rel" x="524" y="442" text-anchor="middle">parses</text>
+<path class="edge" d="M200 510V550" marker-end="url(#a)"/>
+<text class="t-rel" x="208" y="534">skips what it reported</text>
+<path class="edge" d="M350 510V530H700V550" marker-end="url(#a)"/>
+<text class="t-rel" x="420" y="526">searches</text>
+<path class="edge" d="M450 390V378H700V350" marker-end="url(#a)"/>
+<text class="t-rel" x="500" y="374">reports each notice</text>
+<path class="edge" d="M512 770H536" marker-end="url(#a)"/>
+<text class="t-rel" x="524" y="762" text-anchor="middle">dials</text>
+<rect class="b-ext" x="64" y="900" width="920" height="136" rx="10"/>
+<text class="t-code" x="80" y="928">Host environment</text>
+<text class="t-type" x="80" y="946">[read at boot; some defaults are baked in]</text>
+<text class="t-desc" x="80" y="970">MCL_REALM and MCL_REALM_NAME are required and must agree; MCL_REALM_KEY is the trust anchor; MACULA_STATION_SEEDS with</text>
+<text class="t-desc" x="80" y="986">MACULA_STATION_NODE_IDS is the pinned dial. MCL_TENDERS_POLL_MS, MCL_TENDERS_MAX_SEEN and MCL_TENDERS_LOOKBACK_DAYS</text>
+<text class="t-desc" x="80" y="1002">tune the sweep, the reported window and the first day a fresh sensor reads.</text>
+<text class="t-desc" x="80" y="1018">MCL_SERVICE_NAME and MCL_BOX label the boot claim; /health is a Unix socket, not a port.</text>
+<text class="t-desc" x="64" y="1070">No store: since moves past the newest day read only when every notice of the sweep was reported, so a dark mesh or a page TED</text>
+<text class="t-desc" x="64" y="1088">refuses delays a notice and loses none. On restart the sensor starts from today again; a day reported twice is harmless,</text>
+<text class="t-desc" x="64" y="1106">because company nodes deduplicate by publication number.</text>
+<rect class="b-sys" x="24" y="1130" width="22" height="14" rx="3"/>
+<text class="t-leg" x="54" y="1142">In scope</text>
+<rect class="b-per" x="110.8" y="1130" width="22" height="14" rx="3"/>
+<text class="t-leg" x="140.8" y="1142">Person</text>
+<rect class="b-mac" x="184.39999999999998" y="1130" width="22" height="14" rx="3"/>
+<text class="t-leg" x="214.39999999999998" y="1142">Macula infrastructure</text>
+<rect class="b-ext" x="357.0" y="1130" width="22" height="14" rx="3"/>
+<text class="t-leg" x="387.0" y="1142">External system</text>
+<rect class="b-cmp" x="490.0" y="1130" width="22" height="14" rx="3"/>
+<text class="t-leg" x="520.0" y="1142">Container or component</text>
+<rect class="bound" x="669.2" y="1130" width="22" height="14" rx="3"/>
+<text class="t-leg" x="699.2" y="1142">Boundary</text>
+</svg>

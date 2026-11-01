@@ -21,6 +21,14 @@ the_versions_agree_test() ->
                                 [{capture, all_but_first, binary}]),
     ?assertEqual({Reported, Reported}, {list_to_binary(App), Release}).
 
+%% ghcr links the package to the repository this label names, and the image
+%% is named after the release, not the repository: a label copied from the
+%% image name points at a repository that does not exist.
+the_image_names_its_source_repository_test() ->
+    ?assertMatch({match, _},
+                 re:run(read("Containerfile"),
+                        <<"image\\.source=\"https://github\\.com/macula-services/mcl-tenders\"">>)).
+
 %% Relative to the beam rather than the working directory, because eunit runs
 %% from wherever the developer happens to be standing.
 read(Name) ->

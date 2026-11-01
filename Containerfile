@@ -53,7 +53,7 @@ FROM ghcr.io/macula-io/macula-pq-runtime:20260928-1800@sha256:a1d18c6a6a22d8d7fb
 # repository page and does not inherit its visibility. A service that shipped
 # private by accident failed its first pull with a bare "unauthorized", which
 # names nothing and sends you looking in the wrong place.
-LABEL org.opencontainers.image.source="https://github.com/macula-services/mcl-tenders-sensor"
+LABEL org.opencontainers.image.source="https://github.com/macula-services/mcl-tenders"
 # The commit this image was built from (build-push passes github.sha), so a
 # digest a fleet pins can be traced back to its commit.
 ARG REVISION=unknown
