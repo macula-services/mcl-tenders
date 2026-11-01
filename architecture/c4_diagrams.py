@@ -4,6 +4,7 @@ Run:  python3 architecture/c4_diagrams.py
 
   c4-context.svg     Level 1: what mcl-tenders talks to, and the realm around it
   c4-containers.svg  Level 2: the apps of the umbrella, its stores, and how they talk
+  c4-components.svg  Level 3: the profile slice as built, its components and stores
 
 The model comes before the code (macula-services/mcl-tenders#1): it is drawn
 from the Boundary and Design on that issue, and once the apps exist, from the
@@ -227,6 +228,54 @@ def containers():
     d.write()
 
 
+def components():
+    d = Diagram("c4-components.svg", "mcl-tenders components: the profile slice", 1100, 1000)
+    d.box("b-per", 50, 30, 300, 120, "Tenders role holder", "[Person or agent of the realm]",
+          ["Describes or reads the realm's", "profile through a sealed call"], person=True)
+    d.box("b-mac", 400, 30, 300, 120, "macula link", "[library, on this node]",
+          ["Refuses a call in the clear, and", "a caller without the tenders role,", "before any handler runs"])
+    d.box("b-mac", 750, 30, 300, 120, "macula-realm", "[Macula infrastructure]",
+          ["Mints the tenders role and", "anchors the realm's identity"])
+    d.bound(30, 190, 1040, 640, "mcl-tenders [one release]: the profile slice", bottom=True)
+    d.box("b-cmp", 50, 230, 300, 150, "describe_tender_profile_responder", "[guide_tender_lifecycle]",
+          ["Checks every field: CPV codes,", "countries, keywords, exclusions,", "a description. The caller is",
+           "the one who described it."], code=True)
+    d.box("b-sys", 400, 230, 300, 150, "mcl_tenders_service", "[mcl_om service contract]",
+          ["Announces both procedures, sealed,", "for the tenders role only. At boot,", "initiates the realm's profile",
+           "once; after that, it is there."], code=True)
+    d.box("b-cmp", 750, 230, 300, 150, "get_tender_profile_responder", "[query_tenders]",
+          ["Answers the realm's profile,", "or a reason. Never the profile", "of another realm."], code=True)
+    d.box("b-cmp", 50, 430, 300, 150, "tender_profile_aggregate", "[guide_tender_lifecycle, CMD]",
+          ["maybe_initiate_tender_profile and", "maybe_describe_tender_profile. One", "dossier per realm; its state holds",
+           "flags only, never the profile."], code=True)
+    d.box("b-cmp", 400, 430, 300, 150, "*_to_tender_profiles", "[project_tenders, PRJ]",
+          ["One projection per event, through", "tenders_read_model_store, which", "keeps no argument in a crash",
+           "report or a log."], code=True)
+    d.box("b-cmp", 750, 430, 300, 150, "get_tender_profile", "[query_tenders, QRY]",
+          ["find/1 by realm, through", "tenders_query_store. The sensor", "will read it here, in process."],
+          code=True)
+    d.box("b-cmp", 50, 630, 300, 150, "mcl_tenders_store", "[ReckonDB, embedded]",
+          ["Every event of the profile, on", "this node's disk under /data"], code=True)
+    d.box("b-cmp", 400, 630, 300, 150, "tenders.sqlite3", "[SQLite read model]",
+          ["The profile, one row per realm,", "shaped for get_tender_profile"], code=True)
+    d.edge("M350 90H400"); d.text("t-rel", 375, 82, "call", anchor="middle")
+    d.edge("M750 90H700"); d.text("t-rel", 725, 82, "role", anchor="middle")
+    d.edge("M450 150V205H200V230"); d.text("t-rel", 208, 200, "describe_tender_profile")
+    d.edge("M650 150V205H900V230"); d.text("t-rel", 892, 200, "get_tender_profile", anchor="end")
+    d.edge("M200 380V430"); d.text("t-rel", 208, 410, "command")
+    d.edge("M550 380V405H300V430"); d.text("t-rel", 558, 400, "initiates at boot")
+    d.edge("M900 380V430"); d.text("t-rel", 908, 410, "find/1")
+    d.edge("M200 580V630"); d.text("t-rel", 208, 610, "appends events")
+    d.edge("M350 705H375V530H400"); d.text("t-rel", 368, 620, "events", anchor="end", rotate=-90)
+    d.edge("M550 580V630"); d.text("t-rel", 558, 610, "writes")
+    d.edge("M900 580V705H700"); d.text("t-rel", 908, 650, "reads")
+    d.text("t-desc", 50, 870, "The profile says what the realm bids for, so it lives on the node's disk, in the event store and the read model, and")
+    d.text("t-desc", 50, 888, "nowhere else: not in a log, not in a crash report, not in the aggregate's state. Both procedures are sealed and admit")
+    d.text("t-desc", 50, 906, "only identities the realm granted the tenders role. The sensor and the dossier (#7, #4) come next, on this same release.")
+    d.legend(940)
+    d.write()
+
+
 if __name__ == "__main__":
-    for make in (context, containers):
+    for make in (context, containers, components):
         make()

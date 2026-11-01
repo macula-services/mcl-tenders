@@ -1,0 +1,21 @@
+{application, query_tenders, [
+    {description, "QRY: answers from the read model project_tenders writes, in process and through sealed procedures for the tenders role"},
+    {vsn, "0.1.0"},
+    {registered, [query_tenders_sup, tenders_query_store]},
+    {mod, {query_tenders_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        %% The responder implements macula_response and reads the realm
+        %% through mcl_om.
+        macula,
+        mcl_om,
+        esqlite,
+        %% The read model's file and schema are project_tenders'.
+        project_tenders
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

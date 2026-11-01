@@ -1,0 +1,28 @@
+{application, mcl_tenders, [
+    {description, "Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node"},
+    {vsn, "0.1.0"},
+    {registered, [mcl_tenders_sup]},
+    {mod, {mcl_tenders_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        %% Mesh SDK, realm identity, capabilities, health.
+        mcl_om,
+        %% This service's own event store (mcl_tenders_app opens it).
+        reckon_db,
+        evoq,
+        reckon_evoq,
+        %% The process. A library application: its desks run inside evoq's
+        %% aggregate processes, against the store mcl_tenders_app opens.
+        guide_tender_lifecycle,
+        %% The read side. project_tenders starts before mcl_tenders_app opens
+        %% the store subscription, so its projections hear the catch-up replay.
+        project_tenders,
+        query_tenders
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/macula-services/mcl-tenders"}]}
+]}.
