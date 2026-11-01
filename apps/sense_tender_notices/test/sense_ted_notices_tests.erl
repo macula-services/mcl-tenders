@@ -87,11 +87,14 @@ a_complete_sweep_moves_since_to_the_newest_day_test() ->
     P1 = [notice(<<"1-2026">>, <<"2026-10-29">>), notice(<<"2-2026">>, <<"2026-10-28">>)],
     ?assertMatch({ok, {2026, 10, 29}, _, _}, sweep(pages([P1]), reporting(ok))).
 
-the_newest_day_read_again_reports_only_what_is_new_test() ->
+%% The second read reports only what is new, and then since moves past that
+%% day: a release day is read twice, not once per sweep until the next release,
+%% because every realm runs a sensor and TED pays for each of them.
+the_newest_day_is_read_once_more_and_then_left_test() ->
     P1 = [notice(<<"1-2026">>, <<"2026-10-29">>)],
     {ok, Next, W, _} = sweep(pages([P1]), reporting(ok)),
     P2 = [notice(<<"1-2026">>, <<"2026-10-29">>), notice(<<"2-2026">>, <<"2026-10-29">>)],
-    ?assertMatch({ok, {2026, 10, 29}, _, #{reported := 1, already_reported := 1}},
+    ?assertMatch({ok, {2026, 10, 30}, _, #{reported := 1, already_reported := 1}},
                  sweep(Next, pages([P2]), reporting(ok), W)),
     ?assertEqual([<<"2-2026">>], reported()).
 
@@ -140,7 +143,7 @@ a_failed_report_ends_the_sweep_and_is_retried_by_the_next_test() ->
     ?assertMatch({error, {report_failed, mesh_unavailable}, _}, sweep(pages([P1]), Flaky)),
     {error, _, W} = sweep(pages([P1]), Flaky),
     ?assertEqual([<<"1-2026">>], reported()),
-    ?assertMatch({ok, ?SINCE, _, #{reported := 2, already_reported := 1}},
+    ?assertMatch({ok, {2026, 10, 29}, _, #{reported := 2, already_reported := 1}},
                  sweep(pages([P1]), reporting(ok), W)),
     ?assertEqual([<<"2-2026">>, <<"3-2026">>], reported()).
 

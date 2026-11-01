@@ -23,9 +23,12 @@
 %%% out a timeout per notice of a 3,800-notice day helps nobody.
 %%%
 %%% Where it moves to: past the week, when the whole week lies before today, as
-%%% those days are complete; otherwise to the newest day read, so that day is
-%%% read once more and what TED had not yet indexed at this sweep is reported by
-%%% the next (the window drops the rest). It holds no store: on a restart
+%%% those days are complete. Otherwise to the newest day read, so that day is
+%%% read ONCE more and what TED had not yet indexed at this sweep is reported by
+%%% the next (the window drops the rest); a sweep that read nothing newer than
+%%% its own `since' moves past it. So a release day costs two reads, not one per
+%%% sweep until the next release: every realm runs a sensor, and TED pays for
+%%% each of them. It holds no store: on a restart
 %%% `since' starts again from today, and a day reported again is harmless,
 %%% because company nodes deduplicate.
 %%%
@@ -156,14 +159,18 @@ finished(#{window := W} = Acc) ->
     {ok, next_since(Acc), W, maps:with([reported, already_reported, skipped], Acc)}.
 
 %% A week wholly before today is complete: the next sweep starts after it.
-%% Otherwise the newest day read is read again, as TED may still be adding to
-%% it; an empty sweep leaves `since'.
+%% Otherwise a newest day past `since' is read once more, as TED may still have
+%% been adding to it; a newest day that is `since' itself was that second read,
+%% and the next sweep starts after it. An empty sweep leaves `since'.
 next_since(#{last := Last, today := Today}) when Last < Today ->
     calendar:gregorian_days_to_date(calendar:date_to_gregorian_days(Last) + 1);
 next_since(#{since := Since, newest := none}) -> Since;
 next_since(#{since := Since, last := Last, newest := Newest}) ->
-    Days = min(max(calendar:date_to_gregorian_days(Since), Newest), calendar:date_to_gregorian_days(Last)),
-    calendar:gregorian_days_to_date(Days).
+    From = calendar:date_to_gregorian_days(Since),
+    calendar:gregorian_days_to_date(min(read_again(From, Newest), calendar:date_to_gregorian_days(Last))).
+
+read_again(From, Newest) when Newest > From -> Newest;
+read_again(From, _ReadTwice) -> From + 1.
 
 ingest_all([], Acc, _Report) -> {ok, Acc};
 ingest_all([Json | Rest], Acc, Report) -> continued(ingest(Json, Acc, Report), Rest, Report).
