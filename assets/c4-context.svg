@@ -49,9 +49,9 @@
 <circle class="head" cx="66" cy="54" r="9"/>
 <text class="t-name" x="84" y="58">Operator</text>
 <text class="t-type" x="84" y="76">[Person]</text>
-<text class="t-desc" x="56" y="100">Runs one shared sensor for the</text>
-<text class="t-desc" x="56" y="116">realm (BEAM Campus first) and</text>
-<text class="t-desc" x="56" y="132">tunes the sweep, nothing more</text>
+<text class="t-desc" x="56" y="100">Runs the realm's own sensor;</text>
+<text class="t-desc" x="56" y="116">no sensor is shared between</text>
+<text class="t-desc" x="56" y="132">realms. Tunes the sweep only</text>
 <rect class="b-later" x="365" y="30" width="270" height="120" rx="10"/>
 <text class="t-name" x="381" y="58">Company node</text>
 <text class="t-type" x="381" y="76">[External system, later: #3]</text>

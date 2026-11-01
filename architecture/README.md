@@ -15,8 +15,8 @@ threat model (T1 to T13 below), is on macula-services/mcl-tenders#1.
 | Element | Kind | Role |
 | --- | --- | --- |
 | mcl-tenders-sensor | In scope | Sweeps every notice TED published since its last sweep and reports each new one as `tender_notice_reported_v1` on `<realm>/mcl-tenders/tenders/wire/`. Serves no procedure, keeps no store. `/health` is a Unix socket |
-| Operator | Person | Runs one shared sensor for the realm (BEAM Campus first) and tunes the sweep. Nothing the operator sets names a company |
-| Company node | External system, later (#3) | Subscribes to the one topic, with the sensors it trusts as its sources, and matches each notice against a profile that never leaves the company's own node |
+| Operator | Person | Runs the realm's own sensor (each realm runs one; none is shared between realms) and tunes the sweep. Nothing the operator sets names an interest |
+| Company node | External system, later (#3) | In the same realm: subscribes to the one topic, with the realm's own sensors as its sources, and matches each notice against a profile that never leaves the company's own node |
 | TED Search API | External system | `api.ted.europa.eu` v3, anonymous, no key. Every EU notice, eForms and the older schema, in one JSON shape |
 | macula-realm | Macula infrastructure | The trust anchor and the grant: scope `mcl-tenders-sensor` for 30 days, and the boot claim its operator sees |
 | Macula stations, mesh DHT | Macula infrastructure | The pinned dial. The fact goes out through a station, and the DHT holds each advertisement |

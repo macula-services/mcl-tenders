@@ -139,7 +139,7 @@ class Diagram:
 def context():
     d = Diagram("c4-context.svg", "mcl-tenders sensor system context", 1000, 690)
     d.box("b-per", 40, 30, 270, 120, "Operator", "[Person]",
-          ["Runs one shared sensor for the", "realm (BEAM Campus first) and", "tunes the sweep, nothing more"],
+          ["Runs the realm's own sensor;", "no sensor is shared between", "realms. Tunes the sweep only"],
           person=True)
     d.box("b-later", 365, 30, 270, 120, "Company node", "[External system, later: #3]",
           ["Subscribes to the one topic and", "matches each notice against its", "own profile, which never leaves"])

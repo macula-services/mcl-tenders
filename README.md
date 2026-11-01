@@ -26,9 +26,10 @@ Built on macula 18 and `mcl_om` 1.6.
 
 Two parts, one repository, two release images:
 
-- **The sensor** (`mcl-tenders-sensor`, built). One shared sensor per realm reads
-  every notice the EU publishes on TED and reports each new one on the mesh as a
-  public fact. It reads all of TED, so nothing it does says who is interested in
+- **The sensor** (`mcl-tenders-sensor`, built). Each realm runs its own sensor: it
+  reads every notice the EU publishes on TED and reports each new one inside the
+  realm as a fact. A realm is a company or organisation, and it is the trust
+  boundary: there is no sensor shared between realms. It reads all of TED, so nothing it does says who is interested in
   what.
 - **The company node** (macula-services/mcl-tenders#3, not built yet). Runs on a
   company's own node, keeps the company's profile there, and matches each
