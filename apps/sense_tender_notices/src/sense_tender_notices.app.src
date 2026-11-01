@@ -1,6 +1,6 @@
 {application, sense_tender_notices, [
     {description, "Gathering: reads new TED notices in the realm's CPV codes and countries and reports each as one sealed fact, tender_notice_reported_v1"},
-    {vsn, "0.1.0"},
+    {vsn, "0.1.1"},
     %% A LIBRARY APPLICATION, no `mod'. The mcl_tenders release starts its
     %% one process (sense_ted_notices) under mcl_tenders_sup, after the store
     %% and the read side are up; guide_tender_lifecycle builds against
