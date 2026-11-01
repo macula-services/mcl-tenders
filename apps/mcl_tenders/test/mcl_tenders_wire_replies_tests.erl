@@ -22,7 +22,8 @@
 %% it may carry.
 replies() ->
     [{<<"describe_tender_profile">>, {[], []}},
-     {<<"get_tender_profile">>,      {?PROFILE, []}}].
+     {<<"get_tender_profile">>,      {?PROFILE, []}},
+     {<<"archive_tender_profile">>,  {[], []}}].
 
 the_table_names_every_announced_procedure_test() ->
     Announced = [maps:get(name, C) || C <- mcl_tenders_service:capabilities()],
@@ -42,7 +43,8 @@ every_refusal_and_every_success_conforms() ->
     %% Before the boot's initiation: nothing to describe, nothing to read.
     Refusals = [call(<<"describe_tender_profile">>, #{}, ?MEMBER),
                 call(<<"get_tender_profile">>, #{}, ?MEMBER),
-                call(<<"describe_tender_profile">>, #{countries => [{text, <<"be">>}]}, ?MEMBER)],
+                call(<<"describe_tender_profile">>, #{countries => [{text, <<"be">>}]}, ?MEMBER),
+                call(<<"archive_tender_profile">>, #{}, ?MEMBER)],
     [?assertMatch({_, [<<"reason">>], {text, _}},
                   {Name, maps:keys(Reply), maps:get(<<"reason">>, Reply)})
      || {Name, Reply} <- Refusals],
@@ -54,7 +56,9 @@ every_refusal_and_every_success_conforms() ->
       fun() -> maps:get(<<"countries">>, element(2, call(<<"get_tender_profile">>, #{}, ?MEMBER)),
                         absent) end,
       [{text, <<"BEL">>}]),
-    Successes = [Described, call(<<"get_tender_profile">>, #{}, ?MEMBER)],
+    Read = call(<<"get_tender_profile">>, #{}, ?MEMBER),
+    %% Last, because archived is terminal.
+    Successes = [Described, Read, call(<<"archive_tender_profile">>, #{}, ?MEMBER)],
     [?assertEqual({Name, conforms}, {Name, conforms(Name, Reply)}) || {Name, Reply} <- Successes],
     ?assertEqual(lists:sort(proplists:get_keys(replies())),
                  lists:usort([Name || {Name, _} <- Successes])),
@@ -62,7 +66,7 @@ every_refusal_and_every_success_conforms() ->
                  lists:usort([Name || {Name, _} <- Refusals])),
     %% Every value of the profile is text, a list of text or an integer:
     %% never bytes, never a boolean.
-    {_, Profile} = lists:last(Successes),
+    {_, Profile} = Read,
     [?assert(texts(V) orelse is_integer(V)) || V <- maps:values(Profile)].
 
 call(Name, Args, Caller) -> mcl_tenders_pipeline:call(Name, Args, Caller).

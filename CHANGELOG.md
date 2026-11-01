@@ -5,6 +5,21 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Refs macula-services/mcl-tenders#11.
+
+- **The realm can archive its profile** (`archive_tender_profile`, a sealed
+  procedure for the tenders role, like the other two). The realm stops looking
+  for public tenders: `get_tender_profile` answers `archived`, the sensor idles
+  and asks TED nothing, and the profile is not described or archived again
+  (`archived`, `already_archived`). The caller is recorded as `archived_by`.
+  A boot after the archive starts as before and leaves the profile archived.
+- **The read model moves forward in place.** A box that ran 0.1.0 keeps its
+  `tenders.sqlite3`: at boot the store applies each schema step above the
+  file's `PRAGMA user_version`, in a transaction, and a second boot changes
+  nothing. This release adds `archived_at` and `archived_by`.
+
 ## [0.1.0] - 2026-11-02
 
 Refs macula-services/mcl-tenders#2 and #3.

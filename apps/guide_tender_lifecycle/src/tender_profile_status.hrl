@@ -2,3 +2,4 @@
 %%% read with evoq_bit_flags (reckon-db-org/evoq, guides/bit_flags.md).
 -define(TENDER_PROFILE_INITIATED, 1). %% 2^0 -- the realm's profile exists
 -define(TENDER_PROFILE_DESCRIBED, 2). %% 2^1 -- it says what the realm looks for
+-define(TENDER_PROFILE_ARCHIVED,  4). %% 2^2 -- the realm no longer looks; terminal

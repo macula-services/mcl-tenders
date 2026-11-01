@@ -37,6 +37,8 @@ apply_event(S, #{event_type := <<"tender_profile_initiated_v1">>} = Ev) ->
             status = evoq_bit_flags:set(S#state.status, ?TENDER_PROFILE_INITIATED)};
 apply_event(S, #{event_type := <<"tender_profile_described_v1">>}) ->
     S#state{status = evoq_bit_flags:set(S#state.status, ?TENDER_PROFILE_DESCRIBED)};
+apply_event(S, #{event_type := <<"tender_profile_archived_v1">>}) ->
+    S#state{status = evoq_bit_flags:set(S#state.status, ?TENDER_PROFILE_ARCHIVED)};
 apply_event(S, _Unknown) ->
     S.
 
