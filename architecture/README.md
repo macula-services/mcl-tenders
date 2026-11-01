@@ -16,7 +16,7 @@ packages. The diagrams are drawn by `architecture/c4_diagrams.py`.
 | Element | Kind | Role |
 | --- | --- | --- |
 | mcl-tenders | In scope | One Erlang umbrella, one release, on a node of the company's realm. It fetches the notices that fit the realm's own profile, guides each tender from spotted to bid, won or lost, and keeps the profile and the work on that node |
-| Bid team | Person | The company's own people. They set the profile and work each tender in a browser on the company LAN, signed in |
+| Bid team | Person | The company's own people. They set the profile and work each tender in a browser on the company LAN, signed in with their realm identity |
 | Realm operator | Person | Deploys mcl-tenders in the realm and grants the tenders role to the people and agents who may use it |
 | Company agent | External system, optional | An agent of the same realm holding the tenders role. It reads notice text as data, never as instructions |
 | TED Search API | External system | Anonymous, no key. Its query names the realm's CPV codes and countries and a date, and nothing else |
@@ -48,7 +48,7 @@ on the realm's node.
 | `guide_tender_lifecycle` | OTP app, CMD: the process | Two aggregates. `tender_profile`: CPV codes, countries, keywords, exclusions, description. `tender`, keyed by procedure id, the dossier: spotted, pursued or declined, questions asked, bid submitted, won or lost, with corrections and the published award folded in. Hears the fact in its `on_tender_notice_reported_*` process manager, from the realm's sensors only |
 | `project_tenders` | OTP app, PRJ | One projection per event, `{event}_to_{table}`, writing the read models |
 | `query_tenders` | OTP app, QRY | `get_tender_profile`, `get_tenders_page` (the morning list), `get_tender_by_id`. Serves the admin UI and the sensor in process, and agents through sealed procedures that admit only the tenders role |
-| `mcl_tenders_admin` | OTP app, web UI on cowboy | Bound to the LAN, never to a public address; sign-in required. Real controls: a CPV picker, a country list, keywords, exclusions. Shows the morning list and each tender's dossier, and sends the bid team's decisions to `guide_tender_lifecycle` as commands |
+| `mcl_tenders_admin` | OTP app, web UI on cowboy | Bound to the LAN, never to a public address. Sign-in with the realm identity, as on the portal; access follows the tenders role. Real controls: a CPV picker, a country list, keywords, exclusions. Shows the morning list and each tender's dossier, and sends the bid team's decisions to `guide_tender_lifecycle` as commands |
 | Event store | ReckonDB, embedded | Every event of the process, on the node's disk. It holds the bid strategy |
 | Read models | SQLite | The profile, the tenders page and each dossier, shaped for their reads |
 | `mcl_om`, macula | libraries | Realm identity, the pinned dial, `/health`, sealed calls, and the sealed group. The node serves the group's key itself (the SDK's distributor), so the fact needs no other service |
@@ -73,14 +73,13 @@ process's subscription names `sources => {org, <<"mcl-tenders">>}`: nodes the
 realm delegated to the mcl-tenders org, which runs both the sensor and the process. A sensor that is redeployed with a new node id
 keeps working, and no other realm member can feed it a notice.
 
-## Open for Raf
+## Decided (Raf, 2026-11-01, on reading this model)
 
-1. **One release** (above) changes the earlier "one repo, two release images",
-   which assumed a sensor shared between realms. Say if the sensor should stay
-   a separate image anyway.
-2. **Admin UI sign-in.** Binding to the LAN limits who can reach the UI; it does
-   not say who they are. How the bid team signs in is a Design question.
-3. **WP1 (#2, PR #7)** was built as a fetch-all sensor that publishes in the
-   clear. Under this model its parser, fact schema, reported window and sweep
-   pacing stay; it gains the profile read, the narrowed query and the sealed
-   publish.
+1. **One release**, not two images: the sensor reads the profile in process.
+2. **The admin UI signs in with the realm identity**, the same sign-in as the
+   portal. What a person may see and do follows the tenders role the realm
+   grants, as it does for agents.
+3. **WP1 (#2, PR #7) is revised under this model.** Its parser, fact schema,
+   reported window and sweep pacing stay; it gains the profile read, the
+   narrowed query, the sealed publish, and reads a release day twice rather
+   than once per sweep.

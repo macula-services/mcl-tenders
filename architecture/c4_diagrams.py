@@ -183,7 +183,7 @@ def containers():
           ["Anonymous Search API v3"])
     d.bound(30, 190, 1040, 640, "mcl-tenders [one release, on a node of the company's realm]", bottom=True)
     d.box("b-cmp", 50, 230, 300, 150, "mcl_tenders_admin", "[OTP app: web UI, cowboy]",
-          ["LAN only, sign-in required. A CPV", "picker, a country list, keywords,", "exclusions; the morning list and",
+          ["LAN only; realm sign-in. A CPV", "picker, a country list, keywords,", "exclusions; the morning list and",
            "each tender's dossier."], code=True)
     d.box("b-cmp", 400, 230, 300, 150, "query_tenders", "[OTP app: QRY]",
           ["get_tender_profile, get_tenders_page,", "get_tender_by_id. Serves the UI", "in process, and agents through",

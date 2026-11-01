@@ -65,7 +65,7 @@
 <rect class="b-cmp" x="50" y="230" width="300" height="150" rx="10"/>
 <text class="t-code" x="66" y="258">mcl_tenders_admin</text>
 <text class="t-type" x="66" y="276">[OTP app: web UI, cowboy]</text>
-<text class="t-desc" x="66" y="300">LAN only, sign-in required. A CPV</text>
+<text class="t-desc" x="66" y="300">LAN only; realm sign-in. A CPV</text>
 <text class="t-desc" x="66" y="316">picker, a country list, keywords,</text>
 <text class="t-desc" x="66" y="332">exclusions; the morning list and</text>
 <text class="t-desc" x="66" y="348">each tender's dossier.</text>
