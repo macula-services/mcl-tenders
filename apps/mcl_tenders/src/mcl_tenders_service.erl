@@ -7,9 +7,10 @@
 %%
 %% ONE RELEASE PER REALM (architecture/README.md). It keeps the realm's tenders
 %% profile on this node and answers for it only to the identities the realm
-%% granted the tenders role. It asks the realm for no topic authority: its
-%% procedures are CALLs, served under the realm's org-wide provider grant for
-%% mcl-tenders.
+%% granted the tenders role; its sensor asks TED for the profile's CPV codes
+%% and countries and reports each new notice sealed under the realm's tenders
+%% group, whose keys this node serves itself. Its procedures are CALLs, served
+%% under the realm's org-wide provider grant for mcl-tenders.
 -module(mcl_tenders_service).
 
 -behaviour(mcl_om_service).
@@ -37,29 +38,65 @@
 %% loop this exact way.
 -export([event_store/0]).
 
+%% `sealing' says whether the deploy has set up the tenders group (`set') or
+%% not yet (`unset'), in the /health body while the verdict stays ok: a first
+%% boot waits on the realm for the org key, which is a setup state, not a
+%% fault. The variables it waits on are named in the log, never their values.
 info() ->
     #{name => <<"mcl-tenders">>,
       version => <<"0.1.0">>,
-      description => <<"Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node">>}.
+      description => <<"Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node">>,
+      sealing => sealing(tender_notices_group:missing())}.
+
+sealing([]) -> set;
+sealing(_Missing) -> unset.
 
 %% The realm's profile is born the first time mcl-tenders boots in the realm,
 %% and is already there on every boot after. The store is open (mcl_tenders_app)
 %% and the projections listen (project_tenders) by the time this runs.
+%%
+%% The realm name the fact topic and the group carry is checked against the
+%% realm first: a sensor reporting where nobody subscribed looks exactly like
+%% a quiet day at TED.
 start(_Opts) ->
+    ok = mcl_tenders_facts:check_realm_name(),
     {ok, Realm} = mcl_om:realm(),
     ok = maybe_initiate_tender_profile:for_realm(Realm),
+    ok = naming_the_wait(tender_notices_group:missing()),
     mcl_tenders_sup:start_link().
+
+%% Once at boot, so the wait is findable: the variables by name, never a value.
+naming_the_wait([]) ->
+    ok;
+naming_the_wait(Missing) ->
+    logger:notice("[tenders] the tenders group is not set up, so no group key is served and the "
+                  "sensor stays idle; unset: ~ts (macula-services/mcl-om#48)",
+                  [lists:join(", ", Missing)]).
 
 stop(_State) -> ok.
 
 %% Green once the supervision tree is up. A dark mesh is not a health failure:
 %% the profile stays readable in process, and a restart would not light it.
+%% Nor is TED being unreachable (the sweep backs off), nor the group waiting
+%% on its setup (info's `sealing').
 health() -> ok.
 
-%% WHAT THIS SERVICE ANNOUNCES IT CAN DO. Each is a CALL answered by
-%% <name>_responder; README, "Procedures", is the contract.
+%% WHAT THIS SERVICE ANNOUNCES IT CAN DO. The profile's procedures are CALLs
+%% answered by <name>_responder; README, "Procedures", is the contract. And,
+%% once the org key id is known, the tenders group's distributor.
 capabilities() ->
-    [procedure(Name) || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>]].
+    [procedure(Name) || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>]]
+        ++ group_keys(tender_notices_group:org_key_id()).
+
+%% macula's advertise_opts/0: `auth => handler_authorizes', which runs no gate
+%% at the link and hands the handler the call's token and proofs, and
+%% `confidential => required', so a key never travels readable by a station.
+group_keys(undefined) ->
+    [];
+group_keys(_OrgKeyId) ->
+    [maps:merge(#{name => <<"group_keys_v1">>, version => 1,
+                  handler => {mcl_tenders_group_keys_pull, []}},
+                macula_group_keys:advertise_opts())].
 
 %% THE GATE (T2). `{callers, role}': only an identity holding a capability the
 %% realm's tenders role minted for the procedure is admitted -- not a bare
@@ -72,9 +109,10 @@ procedure(Name) ->
       handler => {binary_to_atom(<<Name/binary, "_responder">>), []}}.
 
 %% THE AUTHORITY THIS SERVICE ASKS THE REALM FOR, and deliberately nothing more.
-%% It publishes and subscribes to nothing yet, so it asks for nothing. Popped,
-%% an attacker gains precisely this and no more, which is the whole point of
-%% listing it.
+%% Its one fact travels sealed under the tenders group, and who may read it is
+%% the group's admission, not a realm topic right; a realm role carries no
+%% publish right at all (macula#147). So it asks for nothing. Popped, an
+%% attacker gains precisely this and no more.
 identity_spec() ->
     #{scope => <<"mcl-tenders">>,
       actions => [],

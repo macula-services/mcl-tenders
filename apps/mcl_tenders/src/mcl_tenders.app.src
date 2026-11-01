@@ -1,7 +1,7 @@
 {application, mcl_tenders, [
     {description, "Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node"},
     {vsn, "0.1.0"},
-    {registered, [mcl_tenders_sup]},
+    {registered, [mcl_tenders_sup, mcl_tenders_group_keys, sense_ted_notices]},
     {mod, {mcl_tenders_app, []}},
     {applications, [
         kernel,
@@ -19,7 +19,10 @@
         %% The read side. project_tenders starts before mcl_tenders_app opens
         %% the store subscription, so its projections hear the catch-up replay.
         project_tenders,
-        query_tenders
+        query_tenders,
+        %% The sensor. A library application: mcl_tenders_sup starts its one
+        %% process after the store and the read side are up.
+        sense_tender_notices
     ]},
     {env, []},
     {modules, []},

@@ -1,9 +1,11 @@
-%% @doc Supervises this service's own processes.
+%% @doc Supervises this service's own processes: the tenders group's
+%% distributor, then the TED sensor.
 %%
-%% NO CHILDREN OF ITS OWN: the desks run inside evoq's aggregate processes,
-%% and the read side is supervised by project_tenders and query_tenders, each
-%% its own application. An empty child list is the honest answer, not a
-%% placeholder.
+%% The desks run inside evoq's aggregate processes, and the read side is
+%% supervised by project_tenders and query_tenders, each its own application.
+%% The distributor comes first, so the sensor's first sealed publish finds a
+%% key to pull. Without the org key id it is `ignore' and holds no child, and
+%% the sensor stays idle (tender_notices_group).
 -module(mcl_tenders_sup).
 
 -behaviour(supervisor).
@@ -13,4 +15,12 @@
 start_link() -> supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-    {ok, {#{strategy => one_for_one, intensity => 5, period => 10}, []}}.
+    {ok, {#{strategy => one_for_one, intensity => 5, period => 10},
+          [#{id => mcl_tenders_group_keys,
+             start => {mcl_tenders_group_keys, start_link, []},
+             restart => permanent, shutdown => 5000, type => worker,
+             modules => [mcl_tenders_group_keys]},
+           #{id => sense_ted_notices,
+             start => {sense_ted_notices, start_link, []},
+             restart => permanent, shutdown => 5000, type => worker,
+             modules => [sense_ted_notices]}]}}.

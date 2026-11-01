@@ -69,6 +69,23 @@ services:
       # Where the store lands, matching the volume above. mcl_tenders_app appends
       # the store's id, so the store itself is at /data/mcl_tenders_store.
       - MCL_DATA_DIR=/data
+      # The realm NAME the fact topic and the tenders group carry; sha256 of it
+      # must be MCL_REALM, or the node refuses to start rather than report
+      # where nobody listens.
+      - MCL_REALM_NAME=${MCL_REALM_NAME:?set MCL_REALM_NAME to the realm name, e.g. io.macula}
+      # How often TED is swept (ms), how many publication numbers are
+      # remembered, and how many days before today the sensor starts from.
+      - MCL_TENDERS_POLL_MS=${MCL_TENDERS_POLL_MS:-900000}
+      - MCL_TENDERS_MAX_SEEN=${MCL_TENDERS_MAX_SEEN:-30000}
+      - MCL_TENDERS_LOOKBACK_DAYS=${MCL_TENDERS_LOOKBACK_DAYS:-0}
+      # THE TENDERS GROUP, INTERIM (macula-services/mcl-om#48). The org key's
+      # id from the realm's published org directory, and this node's
+      # group_keys grant, minted by the realm operator. Without both the node
+      # serves no group key and the sensor stays idle: it never reports in the
+      # clear. /health's info says `sealing: unset' until they are set.
+      # The grant is a secret: put it in the box's env file, never in git.
+      - MCL_GROUP_ORG_KEY_ID=${MCL_GROUP_ORG_KEY_ID:-}
+      - MCL_TENDERS_GROUP_UCAN=${MCL_TENDERS_GROUP_UCAN:-}
 
 # The identity volume, NAMED HERE rather than left to the project name, so a
 # `docker compose -p` with a different name reuses the same key instead of

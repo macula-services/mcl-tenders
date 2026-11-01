@@ -3,8 +3,8 @@
 *This exists so a reader can see what mcl-tenders talks to, and what it is made
 of, before any of it is built.*
 
-**Status: the profile slice is built (#3); the rest of the model is ahead of
-the code.** Level 3 below shows the slice as built. The model follows the Boundary as Raf amended
+**Status: the profile slice (#3) and the sensor (#2) are built; the rest of the
+model is ahead of the code.** Level 3 below shows both as built. The model follows the Boundary as Raf amended
 it on macula-services/mcl-tenders#1: each realm runs its own mcl-tenders, the
 realm is the trust boundary, the sensor is filtered by the realm's own profile,
 and the profile is set in a LAN-facing admin UI. Dashed boxes are later work
@@ -45,7 +45,7 @@ on the realm's node.
 
 | Container | Technology | Responsibility |
 | --- | --- | --- |
-| `sense_tender_notices` | OTP app, the sensor | Reads the realm's profile from `query_tenders` in process. Asks TED for the day's notices in the profile's CPV codes and countries, drops the ones an exclusion term hits, and reports each new one as `tender_notice_reported_v1`, sealed under the realm's tenders group. With no profile it fetches nothing |
+| `sense_tender_notices` | OTP app, the sensor | Reads the realm's profile from `query_tenders` in process. Asks TED for the day's notices in the profile's CPV codes and countries, and reports each new one as `tender_notice_reported_v1`, sealed under the realm's tenders group. Keywords and exclusions stay for the dossier's match. With no profile, or without the group set up, it fetches nothing |
 | `guide_tender_lifecycle` | OTP app, CMD: the process | Two aggregates. `tender_profile`: CPV codes, countries, keywords, exclusions, description. `tender`, keyed by procedure id, the dossier: spotted, pursued or declined, questions asked, bid submitted, won or lost, with corrections and the published award folded in. Hears the fact in its `on_tender_notice_reported_*` process manager, from the realm's sensors only |
 | `project_tenders` | OTP app, PRJ | One projection per event, `{event}_to_{table}`, writing the read models |
 | `query_tenders` | OTP app, QRY | `get_tender_profile`, `get_tenders_page` (the morning list), `get_tender_by_id`. Serves the admin UI and the sensor in process, and agents through sealed procedures that admit only the tenders role |
@@ -74,9 +74,9 @@ process's subscription names `sources => {org, <<"mcl-tenders">>}`: nodes the
 realm delegated to the mcl-tenders org, which runs both the sensor and the process. A sensor that is redeployed with a new node id
 keeps working, and no other realm member can feed it a notice.
 
-## Level 3: components, the profile slice
+## Level 3: components, the profile slice and the sensor
 
-![mcl-tenders components: the profile slice](../assets/c4-components.svg)
+![mcl-tenders components: the profile slice and the sensor](../assets/c4-components.svg)
 
 | Component | App | Responsibility |
 | --- | --- | --- |
@@ -85,9 +85,12 @@ keeps working, and no other realm member can feed it a notice.
 | `tender_profile_aggregate` | `guide_tender_lifecycle` | One dossier per realm, stream `tenderprofile-<hash of the realm>`. Its state holds the realm and status flags only: the profile itself is in the events, never in a process's state |
 | `*_to_tender_profiles` | `project_tenders` | One projection per event, writing the realm's row through `tenders_read_model_store` |
 | `tenders_read_model_store`, `tenders_query_store` | `project_tenders`, `query_tenders` | The SQLite connections. Neither puts a query's arguments in a log, a crash report or `format_status`; a raise in the driver is answered as `{error, {sqlite_raised, ...}}` without them, and a stuck store as `store_unavailable` |
-| `get_tender_profile`, its responder | `query_tenders` | `find/1` by realm, in process, for the sensor to come; the responder serves it on the mesh to the tenders role |
+| `get_tender_profile`, its responder | `query_tenders` | `find/1` by realm, in process, for the sensor; the responder serves it on the mesh to the tenders role |
 | `mcl_tenders_store` | ReckonDB | The event store, under `MCL_DATA_DIR` (`/data` in the image) |
 | `tenders.sqlite3` | SQLite | The read model, beside the store |
+| `sense_ted_notices` | `sense_tender_notices` | The sweep. Reads the profile through `get_tender_profile:find/1` before each one, checks the codes again, and asks TED for the days, the CPV codes and the countries. Reports each new notice through `mcl_tenders_facts:report/1`, sealed under `tender_notices_group`. Idle, asking TED nothing, without a usable profile or without the group's two variables |
+| `tender_notices_group` | `sense_tender_notices` | The group: prefix `<realm name>/mcl-tenders/tenders`, org `mcl-tenders`. Answers which variables are missing, by name, and the sealed publish options; reads the grant at the moment of a publish and never logs it |
+| `mcl_tenders_group_keys` | `mcl_tenders` | The group's distributor, macula's `macula_group_keys` for the org, serving `group_keys_v1`. Admits a node with the org's grant (interim, macula-services/mcl-om#48) and a live membership of the realm. Not started without `MCL_GROUP_ORG_KEY_ID` |
 
 ## Decided (Raf, 2026-11-01, on reading this model)
 
@@ -98,4 +101,4 @@ keeps working, and no other realm member can feed it a notice.
 3. **WP1 (#2, PR #7) is revised under this model.** Its parser, fact schema,
    reported window and sweep pacing stay; it gains the profile read, the
    narrowed query, the sealed publish, and reads a release day twice rather
-   than once per sweep.
+   than once per sweep. Built as described.
