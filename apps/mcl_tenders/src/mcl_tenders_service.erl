@@ -42,14 +42,43 @@
 %% not yet (`unset'), in the /health body while the verdict stays ok: a first
 %% boot waits on the realm for the org key, which is a setup state, not a
 %% fault. The variables it waits on are named in the log, never their values.
+%%
+%% `intake' is today's count of spotted tenders, the drops past the day's cap
+%% and the cap itself (T12); `sensor' is whether the sensor sweeps or idles,
+%% the idle reason as a tag only, and when it last finished a whole sweep;
+%% `quiet' is 1 while the sensor idles or has not finished a sweep in a day,
+%% so a quiet stream is not mistaken for a quiet TED (T5). Counts and times,
+%% never a notice or a profile.
 info() ->
     #{name => <<"mcl-tenders">>,
       version => <<"0.1.0">>,
       description => <<"Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node">>,
-      sealing => sealing(tender_notices_group:missing())}.
+      sealing => sealing(tender_notices_group:missing()),
+      intake => intake(tender_intake:today()),
+      sensor => sensor(sense_ted_notices:status()),
+      quiet => quiet(sense_ted_notices:status(), erlang:system_time(millisecond))}.
 
 sealing([]) -> set;
 sealing(_Missing) -> unset.
+
+intake({ok, #{spotted := Spotted, dropped := Dropped, cap := Cap, last_notice_at := Last}}) ->
+    #{spotted => Spotted, dropped => Dropped, cap => Cap, last_notice_at => Last};
+intake({error, unavailable}) -> unavailable.
+
+sensor({ok, #{state := State, idle_reason := Why, last_swept_at := At}}) ->
+    #{state => State, idle_reason => reason_tag(Why), last_swept_at => At};
+sensor({error, unavailable}) -> unavailable.
+
+%% The tag of an idle reason; its detail (a store error, the unset variable
+%% names) stays in the log.
+reason_tag(Why) when is_atom(Why) -> Why;
+reason_tag(Why) when is_tuple(Why), is_atom(element(1, Why)) -> element(1, Why);
+reason_tag(_Why) -> other.
+
+-define(QUIET_AFTER_MS, 24 * 3600 * 1000).
+
+quiet({ok, #{state := sweeping, last_swept_at := At}}, Now) when Now - At < ?QUIET_AFTER_MS -> 0;
+quiet(_Status, _Now) -> 1.
 
 %% The realm's profile is born the first time mcl-tenders boots in the realm,
 %% and is already there on every boot after. The store is open (mcl_tenders_app)
@@ -81,11 +110,13 @@ stop(_State) -> ok.
 %% on its setup (info's `sealing').
 health() -> ok.
 
-%% WHAT THIS SERVICE ANNOUNCES IT CAN DO. The profile's procedures are CALLs
-%% answered by <name>_responder; README, "Procedures", is the contract. And,
+%% WHAT THIS SERVICE ANNOUNCES IT CAN DO. The profile's and the dossiers'
+%% procedures are CALLs answered by <name>_responder; README, "Procedures", is the contract. And,
 %% once the org key id is known, the tenders group's distributor.
 capabilities() ->
-    [procedure(Name) || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>]]
+    [procedure(Name) || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>,
+                                 <<"get_tenders_page">>, <<"get_tender_by_id">>,
+                                 <<"dismiss_tender">>]]
         ++ group_keys(tender_notices_group:org_key_id()).
 
 %% macula's advertise_opts/0: `auth => handler_authorizes', which runs no gate

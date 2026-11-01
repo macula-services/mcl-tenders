@@ -4,11 +4,11 @@
 %%% Each UTC day at most `MCL_TENDERS_DAILY_CAP' tenders are spotted (500 by
 %%% default, far above a realm's normal share of TED's ~3,800 notices a
 %%% day); the rest of the day's spots are dropped, counted, and the first drop
-%%% is logged once, by count. get_tenders_page shows the counts, so the bid
-%%% team sees the flag.
+%%% is logged once, by count. The /health info shows the counts
+%%% (mcl_tenders_service:info/0), so the operator sees the flag.
 %%%
 %%% T5: the time the last notice arrived, fitting or not, so a quiet stream
-%%% shows on the morning list.
+%%% shows on /health.
 %%%
 %%% Kept in memory: a restart starts the day's count again, which can admit at
 %%% most one more cap's worth. Notice text never passes through here.
