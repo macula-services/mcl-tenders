@@ -1,4 +1,4 @@
-# mcl-tenders-sensor — how to run this service.
+# mcl-tenders — how to run this service.
 #
 # Runnable as-is. It carries what the SERVICE knows about itself: its image, its
 # port, the environment variables its own code reads, and its health check.
@@ -7,8 +7,7 @@
 #     MCL_REALM_KEY=<hex of the realm's public signing key> \
 #     MACULA_STATION_SEEDS=station.example:4433 \
 #     MACULA_STATION_NODE_IDS=<64-hex node id of that station> \
-#     MCL_REALM_NAME=<realm name, sha256 of which is MCL_REALM> \
-#     docker compose -p mcl-tenders-sensor -f deploy/docker-compose.yml up -d
+#     docker compose -p mcl-tenders -f deploy/docker-compose.yml up -d
 #
 # IF YOU DEPLOY THROUGH SOMETHING ELSE, keep this file anyway and let the other
 # thing carry PLACEMENT: which host, which station, which realm, which secret
@@ -17,9 +16,9 @@
 # nothing checking them.
 
 services:
-  mcl-tenders-sensor:
-    image: ghcr.io/macula-services/mcl-tenders-sensor:latest
-    container_name: mcl-tenders-sensor
+  mcl-tenders:
+    image: ghcr.io/macula-services/mcl-tenders:latest
+    container_name: mcl-tenders
     restart: unless-stopped
     # HOST NETWORKING IS NOT LAZINESS. macula stations are reachable over IPv6
     # only, and a default docker bridge has no IPv6, so a bridged container
@@ -30,15 +29,20 @@ services:
       # ⚠ THE SERVICE'S IDENTITY LIVES HERE. mcl_om generates the node key on
       # first boot and loads it on every boot after. The image declares this
       # path a VOLUME, and with nothing mounted docker gives each new container
-      # a fresh anonymous one, so any recreate would mint a new node id while
-      # the service looks healthy. A company node trusts this sensor BY THAT
-      # NODE ID (its subscription's sources), so a new id silently cuts every
-      # company that trusts it off from the notices.
+      # a fresh anonymous one, so every recreate (an image updater does them as
+      # routine) would mint a new node id while the service looks healthy.
       - secrets:/etc/mcl/secrets
+      # ⚠ REQUIRED, BECAUSE THIS SERVICE OPENS A STORE. Without the mount the
+      # record lives inside the container and every recreate destroys it, which
+      # is the same as not keeping one, and containers are recreated as a
+      # matter of routine.
+      #
+      # ON A BULK DRIVE, NOT THE ROOT FILESYSTEM, on any fleet node. Those boot
+      # from a small eMMC with a root partition measured in single-digit gigabytes
+      # and keep application data on /bulk0.
+      - ${MCL_DATA:-/bulk0/mcl-tenders}:/data
     labels:
-      # No watchtower runs on the fleet; a host that opts into watchtower
-      # itself keeps this label, and which image runs is decided outside this
-      # file. Harmless otherwise.
+      # Only meaningful if you run an image updater that reads this label. Harmless otherwise.
       - "com.centurylinklabs.watchtower.enable=true"
     environment:
       # No default. A service that guesses its realm announces itself where
@@ -57,26 +61,21 @@ services:
       # that dial could never connect anyway.
       - MACULA_STATION_SEEDS=${MACULA_STATION_SEEDS:?set MACULA_STATION_SEEDS to "host[:port][,host[:port]...]"}
       - MACULA_STATION_NODE_IDS=${MACULA_STATION_NODE_IDS:?set MACULA_STATION_NODE_IDS to the matching 64-hex node ids, comma-separated}
-      # The realm NAME the fact topic carries; sha256 of it must be MCL_REALM,
-      # or the node refuses to start rather than report where nobody listens.
-      - MCL_REALM_NAME=${MCL_REALM_NAME:?set MCL_REALM_NAME to the realm name, e.g. io.macula}
-      # How often TED is swept (ms), how many publication numbers are
-      # remembered, and how many days before today a fresh sensor starts from.
-      - MCL_TENDERS_POLL_MS=${MCL_TENDERS_POLL_MS:-900000}
-      - MCL_TENDERS_MAX_SEEN=${MCL_TENDERS_MAX_SEEN:-30000}
-      - MCL_TENDERS_LOOKBACK_DAYS=${MCL_TENDERS_LOOKBACK_DAYS:-0}
-      - MCL_NODE_NAME=mcl_tenders_sensor
+      - MCL_NODE_NAME=mcl_tenders
       - MCL_NODE_HOST=127.0.0.1
-      - MCL_COOKIE=mcl_tenders_sensor
+      - MCL_COOKIE=mcl_tenders
       # Labels on the claim this service sends the realm at boot, which the
       # realm's operator sees on the pending row: what is asking, and from
       # which box. MCL_BOX comes from the host that deploys it.
-      - MCL_SERVICE_NAME=mcl-tenders-sensor
+      - MCL_SERVICE_NAME=mcl-tenders
       - MCL_BOX=${MCL_BOX:-}
+      # Where the store lands, matching the volume above. mcl_tenders_app appends
+      # the store's id, so the store itself is at /data/mcl_tenders_store.
+      - MCL_DATA_DIR=/data
 
 # The identity volume, NAMED HERE rather than left to the project name, so a
 # `docker compose -p` with a different name reuses the same key instead of
 # quietly starting a second identity. Deleting it retires the node id.
 volumes:
   secrets:
-    name: mcl-tenders-sensor-secrets
+    name: mcl-tenders-secrets

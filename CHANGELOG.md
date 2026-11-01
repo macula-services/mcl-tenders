@@ -5,35 +5,21 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
 
-### Added
+Refs macula-services/mcl-tenders#3.
 
-- The tender sensor (`mcl-tenders-sensor`, macula-services/mcl-tenders#2): sweeps
-  TED's Search API v3 for every notice published since its last sweep, in scroll
-  mode, and reports each new one as `tender_notice_reported_v1` on
-  `<realm>/mcl-tenders/tenders/wire/`. It asks TED for all of it, by date only.
-- `parse_ted_notice`: one Search API notice into one map, eForms and the older
-  schema alike. Calls, prior information notices, corrections and awards are
-  kept; other forms are skipped and counted. No contact field is asked for.
-- `mcl_tenders_facts`: the one topic and its closed field list, pinned by a
-  test. No URL and no contact data; text bounded and stripped of control
-  characters (C0, DEL, C1) and bidirectional overrides; language keys and
-  country codes pass only as three-letter codes. `report/1` answers `ok` only once the mesh took the fact.
-- `reported_window`: the publication numbers already reported, bounded.
-- A sweep reads at most a week, so a sensor far behind catches up instead of
-  outgrowing the page ceiling. One that could not report every notice keeps its
-  days, so a dark mesh or a refused page delays a notice and loses none; the
-  first failed report ends it, and a failed sweep backs off, up to six hours.
-  The newest day is read once more by the next sweep.
-- The `mcl_om` service shell, generated from `rebar3 new mcl_service`: org and
-  scope `mcl-tenders-sensor`, no procedure of its own, no store; `start/1`
-  refuses a realm name that does not hash to `MCL_REALM`.
-- CI: lint, eunit and dialyzer on every push and pull request; dependency
-  advisories (`.github/advisories-waivers.txt` waives cowlib's
-  EEF-CVE-2026-43966 until 2026-12-01, no fixed release yet); the C4 model
-  check. Image: a `v*` tag publishes its version and moves `:latest` only once
-  the digest is signed; `main` publishes `:main` and `:<sha>`; a docs-only push
-  builds nothing.
-- README, `architecture/README.md` and the two C4 diagrams, drawn by
-  `architecture/c4_diagrams.py`.
+- **The realm's tenders profile.** The first slice of the release:
+  `guide_tender_lifecycle` (the `tender_profile` dossier, initiated at boot and
+  described through `describe_tender_profile`), `project_tenders` (its
+  projections into `tenders.sqlite3`) and `query_tenders`
+  (`get_tender_profile`). Both procedures are sealed and admit only the
+  realm's tenders role. The profile reaches no log and no crash report, and a
+  test runs every profile path with canary terms to hold that.
+- **The release and its CI.** `mcl_tenders` boots the slice under `mcl_om`,
+  with its own ReckonDB store under `MCL_DATA_DIR` (`/data`, a volume in the
+  image). Lint and tests run on hosted runners in the pinned builder image,
+  with the shared dependency-advisories scan; an image is built only when both
+  are green, and only a signed release moves `:latest`.
+- **README and C4.** The service README template, and a Level 3 component
+  diagram of the slice in `architecture/README.md`.

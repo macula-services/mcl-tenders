@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Ask a running mcl-tenders-sensor how it is.
+# Ask a running mcl-tenders how it is.
 #
 # /health is a Unix socket inside the container (mcl_om's health_socket), not a
 # port, so this asks the running container itself. Pass the container's name if
-# it is not mcl-tenders-sensor; MCL_ENGINE picks podman over docker:
+# it is not mcl-tenders; MCL_ENGINE picks podman over docker:
 #
 #   scripts/health.sh
-#   MCL_ENGINE=podman scripts/health.sh my-mcl-tenders-sensor
+#   MCL_ENGINE=podman scripts/health.sh my-mcl-tenders
 #
 # THREE OUTCOMES, NOT TWO, because they need different responses from whoever is
 # reading. Unreachable means the container is not running or not answering.
@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-CONTAINER="${1:-mcl-tenders-sensor}"
+CONTAINER="${1:-mcl-tenders}"
 ENGINE="${MCL_ENGINE:-docker}"
 SOCKET=/run/mcl/health.sock
 URL="${CONTAINER}:${SOCKET}"

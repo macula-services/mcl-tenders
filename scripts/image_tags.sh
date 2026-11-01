@@ -9,10 +9,10 @@
 #            branch, and a branch build must publish nothing.
 #
 # The complete list comes from here, so this one case governs all of it;
-# apps/mcl_tenders_sensor/test/mcl_tenders_sensor_image_channels_tests.erl runs it for each ref.
+# apps/mcl_tenders/test/mcl_tenders_image_channels_tests.erl runs it for each ref.
 set -eu
 
-IMAGE=ghcr.io/macula-services/mcl-tenders-sensor
+IMAGE=ghcr.io/macula-services/mcl-tenders
 REF="${GITHUB_REF:?GITHUB_REF is not set}"
 SHA="${GITHUB_SHA:?GITHUB_SHA is not set}"
 

@@ -1,20 +1,15 @@
-"""Generate mcl-tenders' two C4 diagrams into assets/.
+"""Generate mcl-tenders' C4 context and container diagrams into assets/.
 
 Run:  python3 architecture/c4_diagrams.py
 
-  c4-context.svg     Level 1: what the sensor talks to
-  c4-components.svg  Level 2: what it is made of
+  c4-context.svg     Level 1: what mcl-tenders talks to, and the realm around it
+  c4-containers.svg  Level 2: the apps of the umbrella, its stores, and how they talk
+  c4-components.svg  Level 3: the profile slice as built, its components and stores
 
-Drawn from the code, never from a template: the callbacks in
-apps/mcl_tenders_sensor/src/mcl_tenders_sensor_service.erl, the one-child
-supervisor, the sweep in apps/sense_tender_notices/src/sense_ted_notices/, the
-parser and the reported window beside it, the fact in mcl_tenders_facts.erl, the
-deps in rebar.config, the org and realm settings in config/sys.config.src, and the
-variables deploy/docker-compose.yml passes. When one of those changes, the diagram
-changes in the same commit.
-
-The company node (macula-services/mcl-tenders#3) is not built yet and is drawn
-dashed, as later.
+The model comes before the code (macula-services/mcl-tenders#1): it is drawn
+from the Boundary and Design on that issue, and once the apps exist, from the
+code, in the same commit as any change to what it shows. Dashed boxes are later
+work packages.
 
 Colours are plain classes with a prefers-color-scheme: dark block, no CSS custom
 properties (rsvg-convert renders those black), so the SVGs render the same on
@@ -112,9 +107,11 @@ class Diagram:
         for i, line in enumerate(desc):
             self.text("t-desc", x + 16, y + 70 + 16 * i, line)
 
-    def bound(self, x, y, w, h, label):
+    def bound(self, x, y, w, h, label, bottom=False):
+        # bottom=True puts the label on the lower edge, for a boundary that
+        # edges enter from above.
         self.parts.append(f'<rect class="bound" x="{x}" y="{y}" width="{w}" height="{h}" rx="12"/>')
-        self.text("t-bound", x + 16, y + 22, label)
+        self.text("t-bound", x + 16, y + h - 10 if bottom else y + 22, label)
 
     def edge(self, d, later=False):
         self.parts.append(f'<path class="{"edge-later" if later else "edge"}" d="{d}" marker-end="url(#a)"/>')
@@ -137,91 +134,148 @@ class Diagram:
 
 
 def context():
-    d = Diagram("c4-context.svg", "mcl-tenders sensor system context", 1000, 690)
-    d.box("b-per", 40, 30, 270, 120, "Operator", "[Person]",
-          ["Runs the realm's own sensor;", "no sensor is shared between", "realms. Tunes the sweep only"],
+    d = Diagram("c4-context.svg", "mcl-tenders system context", 1000, 760)
+    d.box("b-per", 40, 30, 270, 120, "Bid team", "[Person]",
+          ["The company's own people: they set", "the profile and work each tender,", "in a browser on the company LAN"],
           person=True)
-    d.box("b-later", 365, 30, 270, 120, "Company node", "[External system, later: #3]",
-          ["Subscribes to the one topic and", "matches each notice against its", "own profile, which never leaves"])
-    d.box("b-ext", 690, 30, 270, 120, "TED Search API", "[External system]",
-          ["api.ted.europa.eu v3, anonymous,", "no key; every EU notice, eForms", "and the older schema, as JSON"])
-    d.box("b-sys", 365, 186, 270, 170, "mcl-tenders-sensor", "[mcl_om mesh service]",
-          ["Sweeps every notice TED published", "since its last sweep and reports", "each new one as one fact,",
-           "tender_notice_reported_v1. It asks", "TED for all of it, serves no", "procedure and keeps no store"])
-    d.box("b-mac", 365, 430, 270, 120, "macula-realm", "[Macula infrastructure]",
-          ["The trust anchor and the grant:", "scope mcl-tenders-sensor for 30", "days, and the boot claim"])
-    d.box("b-mac", 690, 430, 270, 120, "Macula stations, mesh DHT", "[Macula infrastructure]",
-          ["The pinned dial; the fact goes out", "through a station, and the DHT", "holds each advertisement"])
-    d.edge("M175 150V168H400V186")
-    d.text("t-rel", 183, 184, "deploys it, sets"); d.text("t-rel", 183, 200, "the sweep")
-    d.edge("M560 186V150", later=True); d.text("t-rel", 552, 172, "one fact per new notice", anchor="end")
-    d.edge("M600 186V168H825V150"); d.text("t-rel", 640, 164, "searches by date only")
-    d.edge("M460 356V430"); d.text("t-rel", 468, 384, "trust anchor, grant")
-    d.edge("M620 356V370H825V430"); d.text("t-rel", 632, 364, "publishes the fact")
-    d.text("t-desc", 40, 596, "The query names a date and nothing else, so TED learns nothing about who uses the notices, and no company")
-    d.text("t-desc", 40, 614, "ever asks the sensor for one notice: every fact carries all a match needs. One topic for every notice, so no")
-    d.text("t-desc", 40, 632, "station on the path sees which codes a company follows. TED down, or a dark mesh, is not a health failure.")
-    d.legend(650, boundary=False)
+    d.box("b-per", 365, 30, 270, 120, "Realm operator", "[Person]",
+          ["Deploys mcl-tenders in the realm", "and grants the tenders role to the", "people and agents who may use it"],
+          person=True)
+    d.box("b-ext", 690, 30, 270, 120, "Company agent", "[External system, optional]",
+          ["An agent of the same realm, holding", "the tenders role; reads notice text", "as data, never as instructions"])
+    d.bound(345, 186, 310, 244, "Company realm", bottom=True)
+    d.box("b-sys", 365, 214, 270, 170, "mcl-tenders", "[Erlang umbrella, one release]",
+          ["Fetches the tender notices that fit", "the realm's own profile, guides each",
+           "from spotted to bid, won or lost,", "and keeps the profile and the work", "on the realm's own node"])
+    d.box("b-ext", 720, 240, 250, 120, "TED Search API", "[External system]",
+          ["Anonymous, no key. Sees the", "realm's CPV codes and countries", "in its query, nothing more"])
+    d.box("b-later", 30, 240, 250, 120, "TenderNed", "[External system, later: #6]",
+          ["The Dutch platform, as a", "second source of the same", "notices; needs credentials"])
+    d.box("b-mac", 365, 470, 270, 120, "macula-realm", "[Macula infrastructure]",
+          ["The trust anchor: membership,", "the tenders role, and the org", "delegation the group key rests on"])
+    d.box("b-mac", 690, 470, 270, 120, "Macula stations, mesh DHT", "[Macula infrastructure]",
+          ["Carry the sealed fact between the", "realm's nodes; they see a topic", "and a size, never a notice"])
+    d.box("b-later", 40, 470, 270, 120, "Company mail server", "[External system, later: #5]",
+          ["Gets the morning digest only", "when an owner switches it on,", "straight from the node"])
+    d.edge("M175 150V170H400V214")
+    d.text("t-rel", 183, 166, "sets the profile, works tenders, on the LAN")
+    d.edge("M500 150V214"); d.text("t-rel", 508, 196, "deploys, grants")
+    d.edge("M825 150V170H600V214"); d.text("t-rel", 817, 166, "sealed calls", anchor="end")
+    d.edge("M635 300H720"); d.text("t-rel", 677, 292, "by date,", anchor="middle")
+    d.text("t-rel", 677, 318, "CPV, country", anchor="middle")
+    d.edge("M365 300H280", later=True); d.text("t-rel", 322, 292, "later", anchor="middle")
+    d.edge("M460 384V470"); d.text("t-rel", 468, 456, "role, delegation")
+    d.edge("M600 384V445H825V470"); d.text("t-rel", 640, 462, "sealed fact, inside the realm")
+    d.edge("M365 365H325V450H175V470", later=True); d.text("t-rel", 183, 444, "digest, opt-in")
+    d.text("t-desc", 40, 636, "The realm is the trust boundary: each realm runs its own mcl-tenders, and no sensor is shared between realms. The profile,")
+    d.text("t-desc", 40, 654, "the matches and the pursuits stay on the realm's node. TED sees the CPV codes and countries the query names; the stations")
+    d.text("t-desc", 40, 672, "see that the realm uses the service, never which notices reached it. Keywords, exclusions and the description never leave.")
+    d.legend(700, boundary=True)
+    d.write()
+
+
+def containers():
+    d = Diagram("c4-containers.svg", "mcl-tenders containers", 1100, 1180)
+    d.box("b-per", 50, 30, 300, 120, "Bid team", "[Person, browser on the LAN]",
+          ["Sets the profile and works", "each tender, signed in"], person=True)
+    d.box("b-ext", 400, 30, 300, 120, "Company agent", "[External system, optional]",
+          ["Holds the tenders role in", "the same realm"])
+    d.box("b-ext", 750, 30, 300, 120, "TED Search API", "[External system]",
+          ["Anonymous Search API v3"])
+    d.bound(30, 190, 1040, 640, "mcl-tenders [one release, on a node of the company's realm]", bottom=True)
+    d.box("b-cmp", 50, 230, 300, 150, "mcl_tenders_admin", "[OTP app: web UI, cowboy]",
+          ["LAN only; realm sign-in. A CPV", "picker, a country list, keywords,", "exclusions; the morning list and",
+           "each tender's dossier."], code=True)
+    d.box("b-cmp", 400, 230, 300, 150, "query_tenders", "[OTP app: QRY]",
+          ["get_tender_profile, get_tenders_page,", "get_tender_by_id. Serves the UI", "in process, and agents through",
+           "sealed procedures, role only."], code=True)
+    d.box("b-sys", 750, 230, 300, 150, "sense_tender_notices", "[OTP app: sensor]",
+          ["Reads the realm's profile, asks TED", "for the day's notices in its CPV", "codes and countries, drops exclusions,",
+           "reports each new one, sealed."], code=True)
+    d.box("b-cmp", 50, 430, 300, 150, "guide_tender_lifecycle", "[OTP app: CMD, the process]",
+          ["The profile and each tender's dossier:", "spotted, pursued or declined, asked,", "submitted, won or lost. Hears the",
+           "fact in on_tender_notice_reported_*."], code=True)
+    d.box("b-cmp", 400, 430, 300, 150, "Read models", "[SQLite]",
+          ["The profile, the tenders page", "and each dossier, shaped for", "the reads: no joins."])
+    d.box("b-mac", 750, 430, 300, 150, "mcl_om and macula", "[libraries]",
+          ["Realm identity, the pinned dial,", "sealed calls, and the sealed group:", "this node serves its key."], code=True)
+    d.box("b-cmp", 50, 630, 300, 150, "Event store", "[ReckonDB, embedded]",
+          ["Every event of the process,", "on this node's disk: it holds", "the bid strategy."])
+    d.box("b-cmp", 400, 630, 300, 150, "project_tenders", "[OTP app: PRJ]",
+          ["One projection per event,", "event_to_table, writing the", "read models."], code=True)
+    d.box("b-mac", 50, 880, 300, 120, "macula-realm", "[Macula infrastructure]",
+          ["Membership, the tenders role,", "the org delegation"])
+    d.box("b-mac", 750, 880, 300, 120, "Macula stations", "[Macula infrastructure]",
+          ["Carry the sealed fact; never", "see a notice"])
+    d.edge("M200 150V230"); d.text("t-rel", 208, 176, "HTTPS on the LAN")
+    d.edge("M550 150V230"); d.text("t-rel", 558, 176, "sealed calls, tenders role")
+    d.edge("M900 230V150"); d.text("t-rel", 908, 176, "by date, CPV, country")
+    d.edge("M350 330H400"); d.text("t-rel", 375, 322, "reads", anchor="middle")
+    d.edge("M750 330H700"); d.text("t-rel", 725, 322, "profile", anchor="middle")
+    d.edge("M200 380V430"); d.text("t-rel", 208, 410, "commands")
+    d.edge("M200 580V630"); d.text("t-rel", 208, 610, "appends events")
+    d.edge("M350 705H400"); d.text("t-rel", 375, 697, "events", anchor="middle")
+    d.edge("M550 630V580"); d.text("t-rel", 558, 624, "writes")
+    d.edge("M550 380V430"); d.text("t-rel", 558, 410, "reads")
+    d.edge("M900 380V430"); d.text("t-rel", 908, 410, "publishes the sealed fact")
+    d.edge("M800 580V605H375V505H350"); d.text("t-rel", 790, 600, "delivers it, from the realm's sensors only", anchor="end")
+    d.edge("M1000 580V880"); d.text("t-rel", 1008, 730, "QUIC")
+    d.edge("M900 580V855H200V880"); d.text("t-rel", 560, 849, "trust anchor, role, delegation", anchor="middle")
+    d.text("t-desc", 50, 1040, "One release, so the profile is read in process and crosses no network. The fact between the sensor and the process goes")
+    d.text("t-desc", 50, 1058, "through the mesh, sealed under the realm's group, so the sensor may also run on another node of the realm. Every procedure")
+    d.text("t-desc", 50, 1076, "is sealed and admits only the tenders role. The event store and the read models hold the bid strategy: back them up as such.")
+    d.legend(1110)
     d.write()
 
 
 def components():
-    d = Diagram("c4-components.svg", "mcl-tenders sensor components", 1040, 1170)
-    d.bound(40, 40, 968, 830, "mcl-tenders-sensor [Container]")
-    d.box("b-cmp", 56, 70, 456, 120, "mcl_tenders_sensor_app", "[OTP application]",
-          ["start/2 calls mcl_om:boot(mcl_tenders_sensor_service).", "The service exports no store_id/0 or data_dir/0,",
-           "so mcl_om starts no reckon-db and no subscription."], code=True)
-    d.box("b-sys", 536, 70, 456, 152, "mcl_tenders_sensor_service", "[:mcl_om_service behaviour]",
-          ["The six callbacks. start/1 refuses a realm whose", "tag is not the sha256 of MCL_REALM_NAME; scope",
-           "mcl-tenders-sensor for 30 days. No procedure of",
-           "its own; mcl-om adds info and get_limits, both open.",
-           "capabilities/0 is the list."], code=True)
-    d.box("b-cmp", 56, 230, 456, 120, "mcl_tenders_sensor_sup", "[supervisor, one_for_one]",
-          ["One child, sense_ted_notices, which owns the", "sweep, the reported window and the publishing.",
-           "A crashed sensor is restarted from today."], code=True)
-    d.box("b-cmp", 536, 230, 456, 120, "mcl_tenders_facts", "[Erlang module]",
-          ["The one topic and its closed field list, every", "string tagged text and bounded, and report/1,",
-           "which answers ok only once the mesh took it."], code=True)
-    d.box("b-cmp", 56, 390, 456, 120, "sense_ted_notices", "[gen_server, the sweep]",
-          ["Every MCL_TENDERS_POLL_MS: a week of notices from", "its since day, page by page in scroll mode,",
-           "paced; the first failed report ends the sweep."], code=True)
-    d.box("b-cmp", 536, 390, 456, 120, "parse_ted_notice", "[Erlang module, pure]",
-          ["One Search API notice into one map: type, buyer,", "CPV codes, titles, deadline, value. No contact",
-           "field is asked for or read; a bad field is empty."], code=True)
-    d.box("b-cmp", 56, 550, 456, 120, "reported_window", "[Erlang module, pure]",
-          ["The publication numbers already reported,", "bounded (30,000 by default) and rebuilt empty",
-           "on restart; company nodes deduplicate too."], code=True)
-    d.box("b-ext", 536, 550, 456, 120, "TED Search API", "[HTTPS, inets and ssl]",
-          ["POST /v3/notices/search, anonymous: a date query,", "scroll mode, 250 notices a page, a fixed field",
-           "list. A 429 doubles the wait, up to six hours."], code=True)
-    d.box("b-mac", 56, 710, 456, 120, "mcl_om", "[library, ~> 1.6]",
-          ["boot/1: loads the identity key, joins the realm,", "dials the pinned stations, serves /health on a",
-           "Unix socket, and carries mcl_om_pubsub:publish/3."], code=True)
-    d.box("b-mac", 536, 710, 456, 120, "macula SDK", "[library, ~> 18.0, wire 1.0]",
-          ["QUIC transport, pubsub over the stations, and", "the publisher every link verified, which is",
-           "what a fact's attribution rests on."], code=True)
-    d.edge("M56 130H16V770H56"); d.text("t-rel", 30, 450, "calls mcl_om:boot/1", anchor="middle", rotate=-90)
-    d.edge("M512 130H536"); d.text("t-rel", 524, 122, "boots", anchor="middle")
-    d.edge("M536 160H520V210H284V230"); d.text("t-rel", 300, 206, "starts")
-    d.edge("M200 350V390"); d.text("t-rel", 208, 374, "one child")
-    d.edge("M512 450H536"); d.text("t-rel", 524, 442, "parses", anchor="middle")
-    d.edge("M200 510V550"); d.text("t-rel", 208, 534, "skips what it reported")
-    d.edge("M350 510V530H700V550"); d.text("t-rel", 420, 526, "searches")
-    d.edge("M450 390V378H700V350"); d.text("t-rel", 500, 374, "reports each notice")
-    d.edge("M512 770H536"); d.text("t-rel", 524, 762, "dials", anchor="middle")
-    d.box("b-ext", 64, 900, 920, 136, "Host environment", "[read at boot; some defaults are baked in]",
-          ["MCL_REALM and MCL_REALM_NAME are required and must agree; MCL_REALM_KEY is the trust anchor; MACULA_STATION_SEEDS with",
-           "MACULA_STATION_NODE_IDS is the pinned dial. MCL_TENDERS_POLL_MS, MCL_TENDERS_MAX_SEEN and MCL_TENDERS_LOOKBACK_DAYS",
-           "tune the sweep, the reported window and the first day a fresh sensor reads.",
-           "MCL_SERVICE_NAME and MCL_BOX label the boot claim; /health is a Unix socket, not a port."],
+    d = Diagram("c4-components.svg", "mcl-tenders components: the profile slice", 1100, 1000)
+    d.box("b-per", 50, 30, 300, 120, "Tenders role holder", "[Person or agent of the realm]",
+          ["Describes or reads the realm's", "profile through a sealed call"], person=True)
+    d.box("b-mac", 400, 30, 300, 120, "macula link", "[library, on this node]",
+          ["Refuses a call in the clear, and", "a caller without the tenders role,", "before any handler runs"])
+    d.box("b-mac", 750, 30, 300, 120, "macula-realm", "[Macula infrastructure]",
+          ["Mints the tenders role and", "anchors the realm's identity"])
+    d.bound(30, 190, 1040, 640, "mcl-tenders [one release]: the profile slice", bottom=True)
+    d.box("b-cmp", 50, 230, 300, 150, "describe_tender_profile_responder", "[guide_tender_lifecycle]",
+          ["Checks every field: CPV codes,", "countries, keywords, exclusions,", "a description. The caller is",
+           "the one who described it."], code=True)
+    d.box("b-sys", 400, 230, 300, 150, "mcl_tenders_service", "[mcl_om service contract]",
+          ["Announces both procedures, sealed,", "for the tenders role only. At boot,", "initiates the realm's profile",
+           "once; after that, it is there."], code=True)
+    d.box("b-cmp", 750, 230, 300, 150, "get_tender_profile_responder", "[query_tenders]",
+          ["Answers the realm's profile,", "or a reason. Never the profile", "of another realm."], code=True)
+    d.box("b-cmp", 50, 430, 300, 150, "tender_profile_aggregate", "[guide_tender_lifecycle, CMD]",
+          ["maybe_initiate_tender_profile and", "maybe_describe_tender_profile. One", "dossier per realm; its state holds",
+           "flags only, never the profile."], code=True)
+    d.box("b-cmp", 400, 430, 300, 150, "*_to_tender_profiles", "[project_tenders, PRJ]",
+          ["One projection per event, through", "tenders_read_model_store, which", "keeps no argument in a crash",
+           "report or a log."], code=True)
+    d.box("b-cmp", 750, 430, 300, 150, "get_tender_profile", "[query_tenders, QRY]",
+          ["find/1 by realm, through", "tenders_query_store. The sensor", "will read it here, in process."],
           code=True)
-    d.text("t-desc", 64, 1070, "No store: since moves only when every notice of the sweep (at most a week) was reported, so a dark mesh or a page TED")
-    d.text("t-desc", 64, 1088, "refuses delays a notice and loses none. On restart the sensor starts from today again; a day reported twice is harmless,")
-    d.text("t-desc", 64, 1106, "because company nodes deduplicate by publication number.")
-    d.legend(1130)
+    d.box("b-cmp", 50, 630, 300, 150, "mcl_tenders_store", "[ReckonDB, embedded]",
+          ["Every event of the profile, on", "this node's disk under /data"], code=True)
+    d.box("b-cmp", 400, 630, 300, 150, "tenders.sqlite3", "[SQLite read model]",
+          ["The profile, one row per realm,", "shaped for get_tender_profile"], code=True)
+    d.edge("M350 90H400"); d.text("t-rel", 375, 82, "call", anchor="middle")
+    d.edge("M750 90H700"); d.text("t-rel", 725, 82, "role", anchor="middle")
+    d.edge("M450 150V205H200V230"); d.text("t-rel", 208, 200, "describe_tender_profile")
+    d.edge("M650 150V205H900V230"); d.text("t-rel", 892, 200, "get_tender_profile", anchor="end")
+    d.edge("M200 380V430"); d.text("t-rel", 208, 410, "command")
+    d.edge("M550 380V405H300V430"); d.text("t-rel", 558, 400, "initiates at boot")
+    d.edge("M900 380V430"); d.text("t-rel", 908, 410, "find/1")
+    d.edge("M200 580V630"); d.text("t-rel", 208, 610, "appends events")
+    d.edge("M350 705H375V530H400"); d.text("t-rel", 368, 620, "events", anchor="end", rotate=-90)
+    d.edge("M550 580V630"); d.text("t-rel", 558, 610, "writes")
+    d.edge("M900 580V705H700"); d.text("t-rel", 908, 650, "reads")
+    d.text("t-desc", 50, 870, "The profile says what the realm bids for, so it lives on the node's disk, in the event store and the read model, and")
+    d.text("t-desc", 50, 888, "nowhere else: not in a log, not in a crash report, not in the aggregate's state. Both procedures are sealed and admit")
+    d.text("t-desc", 50, 906, "only identities the realm granted the tenders role. The sensor and the dossier (#7, #4) come next, on this same release.")
+    d.legend(940)
     d.write()
 
 
 if __name__ == "__main__":
-    for make in (context, components):
+    for make in (context, containers, components):
         make()

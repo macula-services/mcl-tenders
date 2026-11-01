@@ -1,4 +1,4 @@
-## Node identity and runtime flags for mcl_tenders_sensor.
+## Node identity and runtime flags for mcl_tenders.
 -name ${MCL_NODE_NAME}@${MCL_NODE_HOST}
 -setcookie ${MCL_COOKIE}
 

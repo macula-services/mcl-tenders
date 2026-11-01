@@ -1,11 +1,12 @@
-# mcl-tenders-sensor
+# mcl-tenders
 #
-# Public tender sensor: reads new TED notices and reports each as one mesh fact
+# Public tenders that fit a realm's profile, guided from spotted to bid on the
+# realm's own node.
 #
-# NO DATA VOLUME AS GENERATED. The scaffold writes nothing, and a named volume
-# for data that does not exist is a promise the image cannot keep. Add one
-# together with the code that writes it, and declare it here and in the compose
-# file at the same time.
+# ONE DATA VOLUME, /data: the event store and the SQLite read model, the
+# realm's profile among them. MCL_DATA_DIR points the service at it, so a
+# container run without the compose file still keeps its record on the volume
+# rather than in /tmp inside the container, which a recreate destroys.
 
 # ⚠ AN IMAGE PAIR, PINNED BY DIGEST, AND THE PAIR MOVES TOGETHER. The builder
 # carries the whole toolchain: OTP 28.4.3 with an OpenSSL that has ML-DSA,
@@ -62,20 +63,22 @@ LABEL org.opencontainers.image.revision="${REVISION}"
 # A program the service's own code shells out to is installed at this point,
 # in one RUN, with the reason beside it.
 WORKDIR /app
-COPY --from=builder /build/_build/prod/rel/mcl_tenders_sensor ./
+COPY --from=builder /build/_build/prod/rel/mcl_tenders ./
 
 ENV HOME=/app
 ENV RELX_REPLACE_OS_VARS=true
 
-ENV MCL_NODE_NAME=mcl_tenders_sensor
+ENV MCL_NODE_NAME=mcl_tenders
 ENV MCL_NODE_HOST=127.0.0.1
-ENV MCL_COOKIE=mcl_tenders_sensor
+ENV MCL_COOKIE=mcl_tenders
 
-VOLUME ["/etc/mcl/secrets"]
+ENV MCL_DATA_DIR=/data
+
+VOLUME ["/etc/mcl/secrets", "/data"]
 
 # /health is a Unix socket (health_socket in sys.config.src): no port is opened
 # just to be health-checked.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -fsS --unix-socket /run/mcl/health.sock http://localhost/health || exit 1
 
-CMD ["/app/bin/mcl_tenders_sensor", "foreground"]
+CMD ["/app/bin/mcl_tenders", "foreground"]

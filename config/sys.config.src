@@ -29,12 +29,12 @@
         %% shell and expecting that to be enough has cost a sibling service an
         %% hour, because nothing translates between the two by itself.
         {realm,             <<"${MCL_REALM}">>},
-        %% ONE ORG PER SERVICE, NAMED AFTER THE REPOSITORY: the `Org' in every
-        %% procedure it offers (`Org/Name'), and the org the realm's grant
-        %% names. Fixed here rather than read from the environment, because it
-        %% is a property of the service, not of where it runs. Without it
-        %% mcl_om answers `_' and advertises nothing.
-        {org,               <<"mcl-tenders-sensor">>},
+        %% ONE ORG PER SERVICE, NAMED AFTER THE REPOSITORY: the `Org' in every one
+        %% of its own procedure names it offers (`Org/Name'), and the org the realm's
+        %% grant names. Fixed here rather than read from the environment, because it
+        %% is a property of the service, not of where it runs. Without it mcl_om
+        %% refuses to boot, naming the setting.
+        {org,               <<"mcl-tenders">>},
         %% INBOUND GUARD (mcl-om#13), OPTIONAL: framework defaults apply when
         %% absent. Uncomment to override the defaults, rename the alert fact
         %% topic, or name the guardian tier that gates `set_limits' (it is
@@ -69,7 +69,7 @@
         %% An earlier version of this file said the realm's key comes from a
         %% `foundation_realm_trust_list' DHT record rather than from here.
         %% That is WRONG for this path and cost a deployment: `macula_direct_dial'
-        %% never supplies the foundation form, so the pinned key is the only
+        %% never supplies the foundation form, so the pinned key is the sole
         %% way an advertisement is ever trusted.
         {realm_key,         <<"${MCL_REALM_KEY}">>}
     ]},
@@ -91,17 +91,36 @@
     %% and REFUSES a `{macula, puzzle_difficulty, _}' setting at
     %% application start whatever the value: a node that set one would
     %% believe it had chosen a difficulty that nothing reads.
+    %% kem_advertise: this node names its KEM key, so callers seal every
+    %% mcl-tenders call to it and a station on the path relays only ciphertext.
+    %% Each capability of its own is `confidential => required' (the profile
+    %% says what the realm is bidding for), which mcl_om refuses to boot
+    %% without this switch.
     {macula, [
-        {crypto_profile, pq_hybrid}
+        {crypto_profile, pq_hybrid},
+        {kem_advertise, enabled}
     ]},
-    {sense_tender_notices, [
-        %% The realm NAME the fact topic carries. Checked at start: sha256 of it
-        %% must equal MCL_REALM, or the sensor would report where nobody
-        %% subscribed. The sweep's own tuning (MCL_TENDERS_POLL_MS,
-        %% MCL_TENDERS_MAX_SEEN, MCL_TENDERS_LOOKBACK_DAYS) is read from the
-        %% environment in code, falling back to the .app.src defaults, so an
-        %% unset one is never a malformed term here.
-        {realm_name, "${MCL_REALM_NAME}"}
+    %% ==========================================================================
+    %% EVOQ'S ADAPTER, WITHOUT WHICH THIS NODE DOES NOT BOOT
+    %% ==========================================================================
+    %%
+    %% ⚠ MANDATORY BECAUSE THIS SERVICE OWNS A STORE. mcl_tenders_app opens it AND a
+    %% per-store evoq subscription, and that subscription reads the global log
+    %% through evoq, which crashes on `{not_configured, event_store_adapter}' if
+    %% this block is absent. evoq starts as a release-boot application before any
+    %% service's `start/2' runs, so nothing can inject it at runtime.
+    %%
+    %% A sibling service put two of three fleet nodes into a boot-crash loop
+    %% because a store was added without this block. That is why it is generated
+    %% rather than left to be discovered.
+    {evoq, [
+        {event_store_adapter,    reckon_evoq_adapter},
+        {subscription_adapter,   reckon_evoq_adapter},
+        {snapshot_store_adapter, reckon_evoq_adapter},
+        %% A fallback evoq resolves before it knows whether anything dispatches a
+        %% command. It must name the SAME store as `event_store/0''s `id', and a generated
+        %% test compares the two.
+        {store_id,               mcl_tenders_store}
     ]},
     {kernel, [{logger_level, info}]}
 ].

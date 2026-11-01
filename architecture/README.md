@@ -1,87 +1,101 @@
 # mcl-tenders architecture: C4 model
 
-*This exists so a reader can see what the tender sensor talks to, and what it is
-made of, without reading it.*
+*This exists so a reader can see what mcl-tenders talks to, and what it is made
+of, before any of it is built.*
 
-**Status: the sensor is built (macula-services/mcl-tenders#2), nothing is released
-yet.** The company node that matches notices against a company's own profile is
-macula-services/mcl-tenders#3, and is drawn dashed as later. The design, with its
-threat model (T1 to T13 below), is on macula-services/mcl-tenders#1.
+**Status: the profile slice is built (#3); the rest of the model is ahead of
+the code.** Level 3 below shows the slice as built. The model follows the Boundary as Raf amended
+it on macula-services/mcl-tenders#1: each realm runs its own mcl-tenders, the
+realm is the trust boundary, the sensor is filtered by the realm's own profile,
+and the profile is set in a LAN-facing admin UI. Dashed boxes are later work
+packages. The diagrams are drawn by `architecture/c4_diagrams.py`.
 
 ## Level 1: system context
 
-![mcl-tenders sensor system context](../assets/c4-context.svg)
+![mcl-tenders system context](../assets/c4-context.svg)
 
 | Element | Kind | Role |
 | --- | --- | --- |
-| mcl-tenders-sensor | In scope | Sweeps every notice TED published since its last sweep and reports each new one as `tender_notice_reported_v1` on `<realm>/mcl-tenders/tenders/wire/`. Serves no procedure, keeps no store. `/health` is a Unix socket |
-| Operator | Person | Runs the realm's own sensor (each realm runs one; none is shared between realms) and tunes the sweep. Nothing the operator sets names an interest |
-| Company node | External system, later (#3) | In the same realm: subscribes to the one topic, with the realm's own sensors as its sources, and matches each notice against a profile that never leaves the company's own node |
-| TED Search API | External system | `api.ted.europa.eu` v3, anonymous, no key. Every EU notice, eForms and the older schema, in one JSON shape |
-| macula-realm | Macula infrastructure | The trust anchor and the grant: scope `mcl-tenders-sensor` for 30 days, and the boot claim its operator sees |
-| Macula stations, mesh DHT | Macula infrastructure | The pinned dial. The fact goes out through a station, and the DHT holds each advertisement |
+| mcl-tenders | In scope | One Erlang umbrella, one release, on a node of the company's realm. It fetches the notices that fit the realm's own profile, guides each tender from spotted to bid, won or lost, and keeps the profile and the work on that node |
+| Bid team | Person | The company's own people. They set the profile and work each tender in a browser on the company LAN, signed in with their realm identity |
+| Realm operator | Person | Deploys mcl-tenders in the realm and grants the tenders role to the people and agents who may use it |
+| Company agent | External system, optional | An agent of the same realm holding the tenders role. It reads notice text as data, never as instructions |
+| TED Search API | External system | Anonymous, no key. Its query names the realm's CPV codes and countries and a date, and nothing else |
+| macula-realm | Macula infrastructure | The trust anchor: membership, the tenders role, and the org delegation the sealed group's key rests on |
+| Macula stations, mesh DHT | Macula infrastructure | Carry the sealed fact between the realm's nodes. They see a topic and a size, never a notice |
+| TenderNed | External system, later (#6) | A second source of the same notices, for the Netherlands; needs credentials per realm |
+| Company mail server | External system, later (#5) | Gets the morning digest only when an owner switches it on, straight from the node |
 
-What the sensor deliberately does not learn or leak:
+**The realm is the trust boundary.** Each realm runs its own mcl-tenders; no
+sensor is shared between realms. The profile, the matches and the pursuits stay
+on the realm's node.
 
-- **TED learns nothing about who uses the notices (T3).** The query names a date
-  and nothing else; the sensor reads all of TED.
-- **No company asks the sensor anything (T3).** Every fact carries what a match
-  needs, so a company node never sends "give me notice X", which would tell the
-  sensor which notices matched.
-- **One topic for every notice (T3).** Country, CPV code and notice type are
-  payload fields. A topic per code would show every station on the path which
-  codes a company follows.
-- **A closed field list (A5, T4).** No contact field is asked for or read, and the
-  fact carries no URL: the company node rebuilds the TED link from the publication
-  number, so a link in a payload can never be followed.
-- **Notice text is data (T6).** Titles, names and descriptions are bounded and
-  stripped of control characters and bidirectional overrides, because they reach
-  a company's agent. Language keys and country codes pass only as codes.
+**What leaves the realm, and to whom:**
 
-## Level 2: containers and components
+- **TED** sees the realm's CPV codes and countries in the query, from the
+  realm's address. That is the price of a filtered fetch. Keywords, exclusions
+  and the description never leave.
+- **The stations** see that the realm uses the service: a topic, and the size
+  and timing of sealed facts. Never which notices.
+- **Nothing else.** No procedure answers anyone outside the tenders role.
 
-![mcl-tenders sensor components](../assets/c4-components.svg)
+## Level 2: containers
 
-| Component | Technology | Responsibility |
+![mcl-tenders containers](../assets/c4-containers.svg)
+
+| Container | Technology | Responsibility |
 | --- | --- | --- |
-| `mcl_tenders_sensor_app` | OTP application | `start/2` calls `mcl_om:boot(mcl_tenders_sensor_service)`. The service exports no `store_id/0` or `data_dir/0`, so mcl_om starts no reckon-db and no subscription |
-| `mcl_tenders_sensor_service` | the `mcl_om_service` behaviour | The six callbacks. `start/1` refuses a realm whose tag is not the sha256 of `MCL_REALM_NAME`; scope `mcl-tenders-sensor`, 30 days, no actions and no resources. No procedure of its own; `mcl-om` adds `info` and `get_limits`, both open |
-| `mcl_tenders_sensor_sup` | supervisor, `one_for_one` | One child, `sense_ted_notices`, which owns the sweep, the reported window and the publishing. A crashed sensor restarts from today |
-| `mcl_tenders_facts` | Erlang module | The one topic and its closed field list, every string tagged text and bounded, and `report/1`, which publishes synchronously and answers `ok` only once the mesh took it |
-| `sense_ted_notices` | `gen_server`, the sweep | Every `MCL_TENDERS_POLL_MS`: every notice of the week from its `since` day, in TED's scroll mode, 250 a page, half a second apart, cut off at 400 pages. The first failed report ends the sweep; a failed sweep doubles the wait, up to six hours |
-| `parse_ted_notice` | Erlang module, pure | One Search API notice into one map. Corrections are notices with a change-notice version; forms that are neither a call, a prior information notice nor an award are skipped and counted. A missing or odd field is empty, never a crash |
-| `reported_window` | Erlang module, pure | The publication numbers already reported, bounded (30,000 by default, about eight release days) and rebuilt empty on restart |
-| `mcl_om` | library, `~> 1.6` | `boot/1`: loads the identity key, joins the realm, dials the pinned stations, serves `/health` on a Unix socket. Carries `mcl_om_pubsub:publish/3`, which the fact goes through |
-| macula SDK | library, `~> 18.0`, wire 1.0 | QUIC transport, pubsub over the stations, and the verified publisher every fact's attribution rests on |
-| Host environment | read at boot | `MCL_REALM`, `MCL_REALM_NAME`, `MCL_REALM_KEY`, `MACULA_STATION_SEEDS`, `MACULA_STATION_NODE_IDS`, `MCL_TENDERS_POLL_MS`, `MCL_TENDERS_MAX_SEEN`, `MCL_TENDERS_LOOKBACK_DAYS`, `MCL_SERVICE_NAME`, `MCL_BOX`, `MCL_NODE_NAME`, `MCL_NODE_HOST`, `MCL_COOKIE` |
+| `sense_tender_notices` | OTP app, the sensor | Reads the realm's profile from `query_tenders` in process. Asks TED for the day's notices in the profile's CPV codes and countries, drops the ones an exclusion term hits, and reports each new one as `tender_notice_reported_v1`, sealed under the realm's tenders group. With no profile it fetches nothing |
+| `guide_tender_lifecycle` | OTP app, CMD: the process | Two aggregates. `tender_profile`: CPV codes, countries, keywords, exclusions, description. `tender`, keyed by procedure id, the dossier: spotted, pursued or declined, questions asked, bid submitted, won or lost, with corrections and the published award folded in. Hears the fact in its `on_tender_notice_reported_*` process manager, from the realm's sensors only |
+| `project_tenders` | OTP app, PRJ | One projection per event, `{event}_to_{table}`, writing the read models |
+| `query_tenders` | OTP app, QRY | `get_tender_profile`, `get_tenders_page` (the morning list), `get_tender_by_id`. Serves the admin UI and the sensor in process, and agents through sealed procedures that admit only the tenders role |
+| `mcl_tenders_admin` | OTP app, web UI on cowboy | Bound to the LAN, never to a public address. Sign-in with the realm identity, as on the portal; access follows the tenders role. Real controls: a CPV picker, a country list, keywords, exclusions. Shows the morning list and each tender's dossier, and sends the bid team's decisions to `guide_tender_lifecycle` as commands |
+| Event store | ReckonDB, embedded | Every event of the process, on the node's disk. It holds the bid strategy |
+| Read models | SQLite | The profile, the tenders page and each dossier, shaped for their reads |
+| `mcl_om`, macula | libraries | Realm identity, the pinned dial, `/health`, sealed calls, and the sealed group. The node serves the group's key itself (the SDK's distributor), so the fact needs no other service |
 
-There is no store. A sweep reads at most a week, so a sensor far behind catches up a
-week per sweep and never asks for more than the page ceiling. `since` moves only when
-every notice of the sweep was reported: past the week when the week is wholly before
-today, otherwise to the newest day read, which the next sweep reads once more. A dark
-mesh or a page TED refuses delays a notice and loses none; the notices that did go out
-sit in the reported window and are not sent twice.
-On a restart the sensor starts from today again, and a day reported twice is harmless,
-because company nodes deduplicate by publication number.
+**Why one release.** The sensor now reads the profile. In the same release it reads
+it in process, so the profile crosses no network, not even inside the realm.
 
-**Two orgs, on purpose.** The service's own org is `mcl-tenders-sensor`
-(`config/sys.config.src`): its grant and boot claim. The fact topic's org is
-`mcl-tenders`, the owner of the schema the sensor and the company node both build
-against, fixed in `mcl_tenders_facts`. Who reported a fact is not in the topic or the
-payload; macula delivers it as the verified publisher.
+**Why the fact still goes over the mesh.** The sensor and the process are separate
+divisions, and a fact on the mesh is how one division tells another. It also lets
+a realm run the sensor on a second node. Because the sensor is filtered, the facts
+it sends are the realm's matches: so they travel **sealed under the realm's
+tenders group**, and the process subscribes with the realm's sensors as its only
+sources.
 
-## Drawing them
+**Why one topic is still needed.** Inside a realm there is one subscriber, so a
+topic per code would buy no filtering. It would only show the stations which codes
+the realm follows. One topic, sealed, shows them nothing but traffic.
 
-`assets/c4-context.svg` and `assets/c4-components.svg` are generated by
-`architecture/c4_diagrams.py` (`python3 architecture/c4_diagrams.py`), from the code
-and never from this page. When the code they describe changes, they change in the same
-commit.
+**Who is trusted.** Procedures are sealed and admit `{callers, role}`: only the
+identities the realm granted the tenders role, not every realm member. The
+process's subscription names `sources => {org, <<"mcl-tenders">>}`: nodes the
+realm delegated to the mcl-tenders org, which runs both the sensor and the process. A sensor that is redeployed with a new node id
+keeps working, and no other realm member can feed it a notice.
 
-Two rules for the files themselves, so they render everywhere they are read (GitHub,
-an IDE, `rsvg-convert`): self-contained SVG, and literal colours in plain classes
-plus a `prefers-color-scheme` dark block, never CSS custom properties, which
-`rsvg-convert` renders black.
+## Level 3: components, the profile slice
 
-The check that keeps them here is the `c4-model` job in
-`.github/workflows/c4-model.yml`. It is red until both files exist and are shown,
-and it stays red if either one goes missing.
+![mcl-tenders components: the profile slice](../assets/c4-components.svg)
+
+| Component | App | Responsibility |
+| --- | --- | --- |
+| `mcl_tenders_service` | `mcl_tenders` | The mcl_om service contract. Announces `describe_tender_profile` and `get_tender_profile`, sealed, `{callers, role}`. At boot it initiates the realm's profile through `maybe_initiate_tender_profile:for_realm/1`; on every later boot the profile is already there |
+| `describe_tender_profile_responder` | `guide_tender_lifecycle` | Builds `describe_tender_profile_v1` from the payload: every field bounded and its text in NFC, the caller recorded as `described_by`. Replies `{}` or a reason |
+| `tender_profile_aggregate` | `guide_tender_lifecycle` | One dossier per realm, stream `tenderprofile-<hash of the realm>`. Its state holds the realm and status flags only: the profile itself is in the events, never in a process's state |
+| `*_to_tender_profiles` | `project_tenders` | One projection per event, writing the realm's row through `tenders_read_model_store` |
+| `tenders_read_model_store`, `tenders_query_store` | `project_tenders`, `query_tenders` | The SQLite connections. Neither puts a query's arguments in a log, a crash report or `format_status`; a raise in the driver is answered as `{error, {sqlite_raised, ...}}` without them, and a stuck store as `store_unavailable` |
+| `get_tender_profile`, its responder | `query_tenders` | `find/1` by realm, in process, for the sensor to come; the responder serves it on the mesh to the tenders role |
+| `mcl_tenders_store` | ReckonDB | The event store, under `MCL_DATA_DIR` (`/data` in the image) |
+| `tenders.sqlite3` | SQLite | The read model, beside the store |
+
+## Decided (Raf, 2026-11-01, on reading this model)
+
+1. **One release**, not two images: the sensor reads the profile in process.
+2. **The admin UI signs in with the realm identity**, the same sign-in as the
+   portal. What a person may see and do follows the tenders role the realm
+   grants, as it does for agents.
+3. **WP1 (#2, PR #7) is revised under this model.** Its parser, fact schema,
+   reported window and sweep pacing stay; it gains the profile read, the
+   narrowed query, the sealed publish, and reads a release day twice rather
+   than once per sweep.

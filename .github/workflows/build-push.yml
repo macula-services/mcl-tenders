@@ -1,4 +1,4 @@
-# Build the OCI image for mcl-tenders-sensor and push to the registry.
+# Build the OCI image for mcl-tenders and push to the registry.
 #
 # TWO CHANNELS, AND ONLY A SIGNED RELEASE MOVES :latest.
 #
@@ -7,8 +7,8 @@
 #
 # :latest is what anyone outside the fleet pulls, and what deploy/docker-compose.yml
 # runs, so it names a signed release and never an unreviewed tip of main
-# (macula-services/mcl-jobs#9). scripts/image_tags.sh says which tags a ref publishes, and
-# mcl_tenders_sensor_image_channels_tests holds this file to it.
+# (macula-services/mcl-jobs#9, the same rule here). scripts/image_tags.sh says which tags a ref publishes, and
+# mcl_tenders_image_channels_tests holds this file to it.
 #
 # The semver tags stay published so a bad release can be pinned back to a known
 # one. A green `v*` tag IS the deploy: macula-fleet's pin-releases workflow takes
@@ -127,7 +127,7 @@ jobs:
         id: build
         env:
           BUILDAH_FORMAT: docker
-          LOCAL: mcl-tenders-sensor:ci-${{ github.run_id }}-${{ github.run_attempt }}
+          LOCAL: mcl-tenders:ci-${{ github.run_id }}-${{ github.run_attempt }}
           TAGS: ${{ steps.tag.outputs.tags }}
         run: |
           docker build --file Containerfile --build-arg REVISION=${{ github.sha }} --tag "$LOCAL" .
@@ -150,7 +150,7 @@ jobs:
           tag="${TAGS%% *}"
           digest=$(curl -fsSI -H "Authorization: Bearer $(printf %s "$TOKEN" | base64 -w0)" \
               -H "Accept: application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json" \
-              "https://ghcr.io/v2/macula-services/mcl-tenders-sensor/manifests/${tag##*:}" \
+              "https://ghcr.io/v2/macula-services/mcl-tenders/manifests/${tag##*:}" \
             | tr -d '\r' | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest: //p')
           case "$digest" in
             sha256:*) echo "digest=$digest" >> "$GITHUB_OUTPUT" ;;
@@ -165,7 +165,7 @@ jobs:
       - name: Remove this run's images and credentials
         if: always() && steps.login.outcome != 'skipped'
         env:
-          LOCAL: mcl-tenders-sensor:ci-${{ github.run_id }}-${{ github.run_attempt }}
+          LOCAL: mcl-tenders:ci-${{ github.run_id }}-${{ github.run_attempt }}
           TAGS: ${{ steps.tag.outputs.tags }}
         run: |
           for image in "$LOCAL" $TAGS; do
@@ -187,7 +187,7 @@ jobs:
       id-token: write
     uses: macula-io/macula-ci-images/.github/workflows/attest-image.yml@fa59fba58d1b65dce35f8613dcb257273a0f29ed
     with:
-      image: ghcr.io/macula-services/mcl-tenders-sensor
+      image: ghcr.io/macula-services/mcl-tenders
       digest: ${{ needs.build-and-push.outputs.digest }}
       runs-on: '["ubuntu-latest"]'
 
@@ -231,4 +231,4 @@ jobs:
         env:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: scripts/promote_latest.sh ghcr.io/macula-services/mcl-tenders-sensor "${{ needs.build-and-push.outputs.digest }}"
+        run: scripts/promote_latest.sh ghcr.io/macula-services/mcl-tenders "${{ needs.build-and-push.outputs.digest }}"
