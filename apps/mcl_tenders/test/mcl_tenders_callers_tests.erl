@@ -41,7 +41,7 @@ pairs() ->
 per_procedure(Name, Other, #{realm_key := RealmKey, other_realm_key := OtherKey,
                              holder_id := Caller}) ->
     Procedure = mcl_om_capabilities:org_procedure(?ORG, Name),
-    Gate = {realm_member_required, macula_node_keys:key_id(RealmKey, ?PROFILE), ?CALL},
+    Gate = {realm_member_required, macula_node_keys:key_id(RealmKey), ?CALL},
     Role = mint(RealmKey, Caller, proc_mri(?REALM_NAME, Procedure), ?CALL),
     Member = mint(RealmKey, Caller, <<"mri:realm:", ?REALM_NAME/binary>>, <<"member/email-verified">>),
     OtherGrant = mint(RealmKey, Caller,

@@ -3,7 +3,8 @@
 *This exists so a reader can see what mcl-tenders talks to, and what it is made
 of, before any of it is built.*
 
-**Status: the model, ahead of the code.** It follows the Boundary as Raf amended
+**Status: the profile slice is built (#3); the rest of the model is ahead of
+the code.** Level 3 below shows the slice as built. The model follows the Boundary as Raf amended
 it on macula-services/mcl-tenders#1: each realm runs its own mcl-tenders, the
 realm is the trust boundary, the sensor is filtered by the realm's own profile,
 and the profile is set in a LAN-facing admin UI. Dashed boxes are later work
@@ -72,6 +73,21 @@ identities the realm granted the tenders role, not every realm member. The
 process's subscription names `sources => {org, <<"mcl-tenders">>}`: nodes the
 realm delegated to the mcl-tenders org, which runs both the sensor and the process. A sensor that is redeployed with a new node id
 keeps working, and no other realm member can feed it a notice.
+
+## Level 3: components, the profile slice
+
+![mcl-tenders components: the profile slice](../assets/c4-components.svg)
+
+| Component | App | Responsibility |
+| --- | --- | --- |
+| `mcl_tenders_service` | `mcl_tenders` | The mcl_om service contract. Announces `describe_tender_profile` and `get_tender_profile`, sealed, `{callers, role}`. At boot it initiates the realm's profile through `maybe_initiate_tender_profile:for_realm/1`; on every later boot the profile is already there |
+| `describe_tender_profile_responder` | `guide_tender_lifecycle` | Builds `describe_tender_profile_v1` from the payload: every field bounded and its text in NFC, the caller recorded as `described_by`. Replies `{}` or a reason |
+| `tender_profile_aggregate` | `guide_tender_lifecycle` | One dossier per realm, stream `tenderprofile-<hash of the realm>`. Its state holds the realm and status flags only: the profile itself is in the events, never in a process's state |
+| `*_to_tender_profiles` | `project_tenders` | One projection per event, writing the realm's row through `tenders_read_model_store` |
+| `tenders_read_model_store`, `tenders_query_store` | `project_tenders`, `query_tenders` | The SQLite connections. Neither puts a query's arguments in a log, a crash report or `format_status`; a raise in the driver is answered as `{error, {sqlite_raised, ...}}` without them, and a stuck store as `store_unavailable` |
+| `get_tender_profile`, its responder | `query_tenders` | `find/1` by realm, in process, for the sensor to come; the responder serves it on the mesh to the tenders role |
+| `mcl_tenders_store` | ReckonDB | The event store, under `MCL_DATA_DIR` (`/data` in the image) |
+| `tenders.sqlite3` | SQLite | The read model, beside the store |
 
 ## Decided (Raf, 2026-11-01, on reading this model)
 

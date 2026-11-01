@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1000" role="img" aria-label="mcl-tenders components: the profile slice">
+<title>mcl-tenders components: the profile slice</title>
+<style>
+.t-name { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 700; }
+.t-desc { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; }
+.t-rel { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 11.5px; paint-order: stroke; stroke-width: 4px; stroke-linejoin: round; }
+.t-code { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; }
+.t-type { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+.t-bound { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 600; }
+.t-leg { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12px; }
+.edge { fill: none; stroke-width: 1.25; }
+.edge-later { fill: none; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bg { fill: #FFFFFF; }
+.b-sys { fill: #F5E9CC; stroke: #A56F0A; stroke-width: 2; }
+.b-per { fill: #E3EBF2; stroke: #3B5B7A; stroke-width: 1.25; }
+.b-mac { fill: #E6E4EE; stroke: #5E5A78; stroke-width: 1.25; }
+.b-ext { fill: #ECEFED; stroke: #8A9791; stroke-width: 1.25; }
+.b-cmp { fill: #FFFFFF; stroke: #8A9791; stroke-width: 1.25; }
+.b-later { fill: none; stroke: #8A9791; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bound { fill: none; stroke: #B3BDB8; stroke-width: 1; }
+.head { fill: #3B5B7A; }
+.t-name, .t-code { fill: #16201D; }
+.t-type, .t-bound, .t-leg { fill: #66736E; }
+.t-desc { fill: #34413C; }
+.t-rel { fill: #66736E; stroke: #FFFFFF; }
+.edge, .edge-later { stroke: #8A9791; }
+.arrowhead { fill: #8A9791; }
+@media (prefers-color-scheme: dark) {
+.bg { fill: #171F1C; }
+.b-sys { fill: #3A2E13; stroke: #E3AA3C; }
+.b-per { fill: #1D2A36; stroke: #8EB4D8; }
+.b-mac { fill: #26243A; stroke: #A9A4C8; }
+.b-ext { fill: #1C2421; stroke: #7D8B85; }
+.b-cmp { fill: #171F1C; stroke: #7D8B85; }
+.b-later { stroke: #7D8B85; }
+.bound { stroke: #4A5752; }
+.head { fill: #8EB4D8; }
+.t-name, .t-code { fill: #E6ECE9; }
+.t-type, .t-bound, .t-leg { fill: #93A09A; }
+.t-desc { fill: #C3CDC8; }
+.t-rel { fill: #93A09A; stroke: #171F1C; }
+.edge, .edge-later { stroke: #7D8B85; }
+.arrowhead { fill: #7D8B85; }
+}
+</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect class="bg" x="0" y="0" width="1100" height="1000"/>
+<rect class="b-per" x="50" y="30" width="300" height="120" rx="10"/>
+<circle class="head" cx="76" cy="54" r="9"/>
+<text class="t-name" x="94" y="58">Tenders role holder</text>
+<text class="t-type" x="94" y="76">[Person or agent of the realm]</text>
+<text class="t-desc" x="66" y="100">Describes or reads the realm's</text>
+<text class="t-desc" x="66" y="116">profile through a sealed call</text>
+<rect class="b-mac" x="400" y="30" width="300" height="120" rx="10"/>
+<text class="t-name" x="416" y="58">macula link</text>
+<text class="t-type" x="416" y="76">[library, on this node]</text>
+<text class="t-desc" x="416" y="100">Refuses a call in the clear, and</text>
+<text class="t-desc" x="416" y="116">a caller without the tenders role,</text>
+<text class="t-desc" x="416" y="132">before any handler runs</text>
+<rect class="b-mac" x="750" y="30" width="300" height="120" rx="10"/>
+<text class="t-name" x="766" y="58">macula-realm</text>
+<text class="t-type" x="766" y="76">[Macula infrastructure]</text>
+<text class="t-desc" x="766" y="100">Mints the tenders role and</text>
+<text class="t-desc" x="766" y="116">anchors the realm's identity</text>
+<rect class="bound" x="30" y="190" width="1040" height="640" rx="12"/>
+<text class="t-bound" x="46" y="820">mcl-tenders [one release]: the profile slice</text>
+<rect class="b-cmp" x="50" y="230" width="300" height="150" rx="10"/>
+<text class="t-code" x="66" y="258">describe_tender_profile_responder</text>
+<text class="t-type" x="66" y="276">[guide_tender_lifecycle]</text>
+<text class="t-desc" x="66" y="300">Checks every field: CPV codes,</text>
+<text class="t-desc" x="66" y="316">countries, keywords, exclusions,</text>
+<text class="t-desc" x="66" y="332">a description. The caller is</text>
+<text class="t-desc" x="66" y="348">the one who described it.</text>
+<rect class="b-sys" x="400" y="230" width="300" height="150" rx="10"/>
+<text class="t-code" x="416" y="258">mcl_tenders_service</text>
+<text class="t-type" x="416" y="276">[mcl_om service contract]</text>
+<text class="t-desc" x="416" y="300">Announces both procedures, sealed,</text>
+<text class="t-desc" x="416" y="316">for the tenders role only. At boot,</text>
+<text class="t-desc" x="416" y="332">initiates the realm's profile</text>
+<text class="t-desc" x="416" y="348">once; after that, it is there.</text>
+<rect class="b-cmp" x="750" y="230" width="300" height="150" rx="10"/>
+<text class="t-code" x="766" y="258">get_tender_profile_responder</text>
+<text class="t-type" x="766" y="276">[query_tenders]</text>
+<text class="t-desc" x="766" y="300">Answers the realm's profile,</text>
+<text class="t-desc" x="766" y="316">or a reason. Never the profile</text>
+<text class="t-desc" x="766" y="332">of another realm.</text>
+<rect class="b-cmp" x="50" y="430" width="300" height="150" rx="10"/>
+<text class="t-code" x="66" y="458">tender_profile_aggregate</text>
+<text class="t-type" x="66" y="476">[guide_tender_lifecycle, CMD]</text>
+<text class="t-desc" x="66" y="500">maybe_initiate_tender_profile and</text>
+<text class="t-desc" x="66" y="516">maybe_describe_tender_profile. One</text>
+<text class="t-desc" x="66" y="532">dossier per realm; its state holds</text>
+<text class="t-desc" x="66" y="548">flags only, never the profile.</text>
+<rect class="b-cmp" x="400" y="430" width="300" height="150" rx="10"/>
+<text class="t-code" x="416" y="458">*_to_tender_profiles</text>
+<text class="t-type" x="416" y="476">[project_tenders, PRJ]</text>
+<text class="t-desc" x="416" y="500">One projection per event, through</text>
+<text class="t-desc" x="416" y="516">tenders_read_model_store, which</text>
+<text class="t-desc" x="416" y="532">keeps no argument in a crash</text>
+<text class="t-desc" x="416" y="548">report or a log.</text>
+<rect class="b-cmp" x="750" y="430" width="300" height="150" rx="10"/>
+<text class="t-code" x="766" y="458">get_tender_profile</text>
+<text class="t-type" x="766" y="476">[query_tenders, QRY]</text>
+<text class="t-desc" x="766" y="500">find/1 by realm, through</text>
+<text class="t-desc" x="766" y="516">tenders_query_store. The sensor</text>
+<text class="t-desc" x="766" y="532">will read it here, in process.</text>
+<rect class="b-cmp" x="50" y="630" width="300" height="150" rx="10"/>
+<text class="t-code" x="66" y="658">mcl_tenders_store</text>
+<text class="t-type" x="66" y="676">[ReckonDB, embedded]</text>
+<text class="t-desc" x="66" y="700">Every event of the profile, on</text>
+<text class="t-desc" x="66" y="716">this node's disk under /data</text>
+<rect class="b-cmp" x="400" y="630" width="300" height="150" rx="10"/>
+<text class="t-code" x="416" y="658">tenders.sqlite3</text>
+<text class="t-type" x="416" y="676">[SQLite read model]</text>
+<text class="t-desc" x="416" y="700">The profile, one row per realm,</text>
+<text class="t-desc" x="416" y="716">shaped for get_tender_profile</text>
+<path class="edge" d="M350 90H400" marker-end="url(#a)"/>
+<text class="t-rel" x="375" y="82" text-anchor="middle">call</text>
+<path class="edge" d="M750 90H700" marker-end="url(#a)"/>
+<text class="t-rel" x="725" y="82" text-anchor="middle">role</text>
+<path class="edge" d="M450 150V205H200V230" marker-end="url(#a)"/>
+<text class="t-rel" x="208" y="200">describe_tender_profile</text>
+<path class="edge" d="M650 150V205H900V230" marker-end="url(#a)"/>
+<text class="t-rel" x="892" y="200" text-anchor="end">get_tender_profile</text>
+<path class="edge" d="M200 380V430" marker-end="url(#a)"/>
+<text class="t-rel" x="208" y="410">command</text>
+<path class="edge" d="M550 380V405H300V430" marker-end="url(#a)"/>
+<text class="t-rel" x="558" y="400">initiates at boot</text>
+<path class="edge" d="M900 380V430" marker-end="url(#a)"/>
+<text class="t-rel" x="908" y="410">find/1</text>
+<path class="edge" d="M200 580V630" marker-end="url(#a)"/>
+<text class="t-rel" x="208" y="610">appends events</text>
+<path class="edge" d="M350 705H375V530H400" marker-end="url(#a)"/>
+<text class="t-rel" x="368" y="620" text-anchor="end" transform="rotate(-90 368 620)">events</text>
+<path class="edge" d="M550 580V630" marker-end="url(#a)"/>
+<text class="t-rel" x="558" y="610">writes</text>
+<path class="edge" d="M900 580V705H700" marker-end="url(#a)"/>
+<text class="t-rel" x="908" y="650">reads</text>
+<text class="t-desc" x="50" y="870">The profile says what the realm bids for, so it lives on the node's disk, in the event store and the read model, and</text>
+<text class="t-desc" x="50" y="888">nowhere else: not in a log, not in a crash report, not in the aggregate's state. Both procedures are sealed and admit</text>
+<text class="t-desc" x="50" y="906">only identities the realm granted the tenders role. The sensor and the dossier (#7, #4) come next, on this same release.</text>
+<rect class="b-sys" x="24" y="940" width="22" height="14" rx="3"/>
+<text class="t-leg" x="54" y="952">In scope</text>
+<rect class="b-per" x="110.8" y="940" width="22" height="14" rx="3"/>
+<text class="t-leg" x="140.8" y="952">Person</text>
+<rect class="b-mac" x="184.39999999999998" y="940" width="22" height="14" rx="3"/>
+<text class="t-leg" x="214.39999999999998" y="952">Macula infrastructure</text>
+<rect class="b-ext" x="357.0" y="940" width="22" height="14" rx="3"/>
+<text class="t-leg" x="387.0" y="952">External system</text>
+<rect class="b-cmp" x="490.0" y="940" width="22" height="14" rx="3"/>
+<text class="t-leg" x="520.0" y="952">Container or component</text>
+<rect class="bound" x="669.2" y="940" width="22" height="14" rx="3"/>
+<text class="t-leg" x="699.2" y="952">Boundary</text>
+</svg>

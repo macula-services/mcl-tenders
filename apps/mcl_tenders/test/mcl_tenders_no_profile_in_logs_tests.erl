@@ -35,11 +35,9 @@ start() ->
     Pipeline = mcl_tenders_pipeline:start("mcl_tenders_no_profile_in_logs_tests"),
     #{level := Level} = logger:get_primary_config(),
     ok = logger:set_primary_config(level, all),
-    ok = logger:add_handler(?MODULE, ?MODULE, #{level => all, config => #{pid => self()}}),
     {Pipeline, Level}.
 
 stop({Pipeline, Level}) ->
-    _ = logger:remove_handler(?MODULE),
     ok = logger:set_primary_config(level, Level),
     mcl_tenders_pipeline:stop(Pipeline).
 
@@ -48,7 +46,13 @@ log(Event, #{config := #{pid := Pid}}) ->
     Pid ! {logged, Event},
     ok.
 
+%% The handler is added here, not in setup: eunit runs the test in a process
+%% of its own, and the handler sends to the process that added it.
 every_profile_path_leaves_no_canary_in_any_log() ->
+    ok = logger:add_handler(?MODULE, ?MODULE, #{level => all, config => #{pid => self()}}),
+    try every_profile_path_logged() after logger:remove_handler(?MODULE) end.
+
+every_profile_path_logged() ->
     Realm = mcl_tenders_pipeline:realm(),
     ok = maybe_initiate_tender_profile:for_realm(Realm),
     {_, #{}} = describe(#{keywords => [{text, <<"zqcpvkw0rd">>}],
