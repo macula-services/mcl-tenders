@@ -15,14 +15,32 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(MEMBER, <<16#a1:256>>).
+-define(TENDER, <<"85e562c1-17d1-4192-a543-082edb9b62ab">>).
 -define(PROFILE, [<<"cpv_codes">>, <<"countries">>, <<"described_at">>, <<"described_by">>,
                   <<"description">>, <<"exclusions">>, <<"keywords">>]).
+-define(DOSSIER, [<<"tender_id">>, <<"publication_number">>, <<"procedure_id">>, <<"notice_type">>,
+                  <<"buyer_name">>, <<"buyer_country">>, <<"cpv_codes">>, <<"titles">>,
+                  <<"description">>, <<"description_lang">>, <<"deadline_at">>,
+                  <<"estimated_value">>, <<"currency">>, <<"published_at">>, <<"status">>,
+                  <<"matched_cpv_codes">>, <<"matched_keywords">>, <<"spotted_at">>,
+                  <<"corrected_by">>, <<"amended_at">>, <<"award_publication_number">>,
+                  <<"award_published_at">>, <<"dismissed_by">>, <<"dismissed_at">>, <<"ted_url">>]).
 
 %% THE TABLE. Per procedure: the keys every success reply carries, and the keys
 %% it may carry.
 replies() ->
     [{<<"describe_tender_profile">>, {[], []}},
-     {<<"get_tender_profile">>,      {?PROFILE, []}}].
+     {<<"get_tender_profile">>,      {?PROFILE, []}},
+     {<<"get_tenders_page">>,        {[<<"tenders">>], []}},
+     {<<"get_tender_by_id">>,        {?DOSSIER, []}},
+     {<<"dismiss_tender">>,          {[], []}}].
+
+%% One entry of the morning list, and the whole dossier.
+summary_keys() ->
+    lists:sort([<<"tender_id">>, <<"publication_number">>, <<"notice_type">>, <<"buyer_name">>,
+                <<"buyer_country">>, <<"titles">>, <<"deadline_at">>, <<"estimated_value">>,
+                <<"currency">>, <<"published_at">>, <<"status">>, <<"matched_cpv_codes">>,
+                <<"matched_keywords">>, <<"ted_url">>]).
 
 the_table_names_every_announced_procedure_test() ->
     Announced = [maps:get(name, C) || C <- mcl_tenders_service:capabilities()],
@@ -42,19 +60,33 @@ every_refusal_and_every_success_conforms() ->
     %% Before the boot's initiation: nothing to describe, nothing to read.
     Refusals = [call(<<"describe_tender_profile">>, #{}, ?MEMBER),
                 call(<<"get_tender_profile">>, #{}, ?MEMBER),
-                call(<<"describe_tender_profile">>, #{countries => [{text, <<"be">>}]}, ?MEMBER)],
+                call(<<"describe_tender_profile">>, #{countries => [{text, <<"be">>}]}, ?MEMBER),
+                call(<<"get_tenders_page">>, #{limit => 0}, ?MEMBER),
+                call(<<"get_tender_by_id">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER)],
     [?assertMatch({_, [<<"reason">>], {text, _}},
                   {Name, maps:keys(Reply), maps:get(<<"reason">>, Reply)})
      || {Name, Reply} <- Refusals],
     ok = maybe_initiate_tender_profile:for_realm(mcl_tenders_pipeline:realm()),
     Described = call(<<"describe_tender_profile">>,
-                     #{cpv_codes => [{text, <<"72000000">>}], countries => [{text, <<"BEL">>}]},
+                     #{cpv_codes => [{text, <<"72000000">>}],
+                       countries => [{text, <<"BEL">>}, {text, <<"NLD">>}]},
                      ?MEMBER),
     mcl_tenders_pipeline:eventually(
       fun() -> maps:get(<<"countries">>, element(2, call(<<"get_tender_profile">>, #{}, ?MEMBER)),
                         absent) end,
-      [{text, <<"BEL">>}]),
-    Successes = [Described, call(<<"get_tender_profile">>, #{}, ?MEMBER)],
+      [{text, <<"BEL">>}, {text, <<"NLD">>}]),
+    {spot_tender, ok} = mcl_tenders_pipeline:reported(tender_notice_fixture:fact()),
+    mcl_tenders_pipeline:eventually(
+      fun() -> maps:is_key(<<"reason">>, element(2, call(<<"get_tender_by_id">>,
+                                                         #{tender_id => {text, ?TENDER}}, ?MEMBER)))
+      end, false),
+    {_, Page} = Listed = call(<<"get_tenders_page">>, #{since => 0, limit => 10}, ?MEMBER),
+    [Entry] = maps:get(<<"tenders">>, Page),
+    ?assertEqual(summary_keys(), lists:sort(maps:keys(Entry))),
+    Successes = [Described, call(<<"get_tender_profile">>, #{}, ?MEMBER), Listed,
+                 call(<<"get_tender_by_id">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                 call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER)],
     [?assertEqual({Name, conforms}, {Name, conforms(Name, Reply)}) || {Name, Reply} <- Successes],
     ?assertEqual(lists:sort(proplists:get_keys(replies())),
                  lists:usort([Name || {Name, _} <- Successes])),
@@ -62,8 +94,13 @@ every_refusal_and_every_success_conforms() ->
                  lists:usort([Name || {Name, _} <- Refusals])),
     %% Every value of the profile is text, a list of text or an integer:
     %% never bytes, never a boolean.
-    {_, Profile} = lists:last(Successes),
-    [?assert(texts(V) orelse is_integer(V)) || V <- maps:values(Profile)].
+    {_, Profile} = lists:nth(2, Successes),
+    [?assert(texts(V) orelse is_integer(V)) || V <- maps:values(Profile)],
+    %% So is every value of a dossier and of a list entry, titles aside:
+    %% a list of `{lang, title}', a language never a map key.
+    {_, Dossier} = lists:nth(4, Successes),
+    [?assert(texts(V) orelse is_integer(V)) || V <- maps:values(maps:remove(<<"titles">>, Dossier))],
+    [?assertEqual([<<"lang">>, <<"title">>], lists:sort(maps:keys(T))) || T <- maps:get(<<"titles">>, Dossier)].
 
 call(Name, Args, Caller) -> mcl_tenders_pipeline:call(Name, Args, Caller).
 

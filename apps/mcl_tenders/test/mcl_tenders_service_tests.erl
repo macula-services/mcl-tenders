@@ -71,9 +71,10 @@ health_is_green_test() ->
 %% T2, as declared: every one admits the tenders role only, `{callers, role}',
 %% and requires a sealed call. mcl_tenders_callers_tests runs macula's own gate
 %% on that declaration.
-announces_the_profile_procedures_for_the_tenders_role_only_test() ->
+announces_the_procedures_for_the_tenders_role_only_test() ->
     Caps = without_org_key(fun ?SERVICE:capabilities/0),
-    ?assertEqual([<<"describe_tender_profile">>, <<"get_tender_profile">>],
+    ?assertEqual([<<"describe_tender_profile">>, <<"get_tender_profile">>, <<"get_tenders_page">>,
+                  <<"get_tender_by_id">>, <<"dismiss_tender">>],
                  [N || #{name := N} <- Caps]),
     ?assertEqual([required], lists:usort([maps:get(confidential, C, absent) || C <- Caps])),
     ?assertEqual([{callers, role}], lists:usort([maps:get(auth, C, absent) || C <- Caps])),
@@ -129,15 +130,57 @@ asks_for_no_topic_authority_test() ->
 %% The distributor, then the sensor. Without the group's setup the
 %% distributor is not started (`ignore') and the sensor stays idle: started
 %% here without mcl_om, it asks TED nothing and the tree stands.
-supervisor_starts_the_distributor_and_the_sensor_test() ->
+%% T5, T12: /health shows the day's intake and how the sensor is, as counts,
+%% tags and times, and the body stays JSON (mcl_om encodes it with jsx).
+health_info_shows_the_intake_and_the_sensor_test() ->
+    persistent_term:erase(sense_ted_notices),
+    #{intake := unavailable, sensor := unavailable, quiet := 1} = Down = ?SERVICE:info(),
+    ?assert(is_binary(jsx:encode(Down))),
+    Now = erlang:system_time(millisecond),
+    {ok, Pid} = tender_intake:start_link(),
+    unlink(Pid),
+    try
+        ok = tender_intake:admit(),
+        persistent_term:put(sense_ted_notices,
+                            {ok, #{state => sweeping, idle_reason => none, last_swept_at => Now}}),
+        Up = ?SERVICE:info(),
+        ?assertMatch(#{intake := #{spotted := 1, dropped := 0, cap := 500, last_notice_at := 0},
+                       sensor := #{state := sweeping, idle_reason := none, last_swept_at := Now},
+                       quiet := 0}, Up),
+        ?assert(is_binary(jsx:encode(Up))),
+        %% Idle: the reason's tag only, never its detail.
+        persistent_term:put(sense_ted_notices,
+                            {ok, #{state => idle, idle_reason => {sealing_unset, ["MCL_TENDERS_GROUP_UCAN"]},
+                                   last_swept_at => Now}}),
+        ?assertMatch(#{sensor := #{idle_reason := sealing_unset}, quiet := 1}, ?SERVICE:info()),
+        %% Sweeping, but no whole sweep in a day: quiet.
+        persistent_term:put(sense_ted_notices,
+                            {ok, #{state => sweeping, idle_reason => none,
+                                   last_swept_at => Now - 25 * 3600 * 1000}}),
+        ?assertMatch(#{quiet := 1}, ?SERVICE:info())
+    after
+        persistent_term:erase(sense_ted_notices),
+        stopped(Pid)
+    end.
+
+%% Waits for the process to be gone, so the next start of its name cannot race it.
+stopped(Pid) ->
+    Ref = monitor(process, Pid),
+    exit(Pid, shutdown),
+    receive {'DOWN', Ref, process, Pid, _} -> ok after 5000 -> error({still_alive, Pid}) end.
+
+%% The day's intake starts before the sensor, so the first notice is counted.
+supervisor_starts_the_distributor_the_intake_and_the_sensor_test() ->
     {ok, {_Flags, Children}} = mcl_tenders_sup:init([]),
-    ?assertEqual([mcl_tenders_group_keys, sense_ted_notices], [maps:get(id, C) || C <- Children]),
+    ?assertEqual([mcl_tenders_group_keys, tender_intake, sense_ted_notices],
+                 [maps:get(id, C) || C <- Children]),
     without_org_key(fun() ->
         {ok, Pid} = mcl_tenders_sup:start_link(),
-        ?assertMatch([{sense_ted_notices, P, worker, _}, {mcl_tenders_group_keys, undefined, worker, _}]
-                       when is_pid(P), supervisor:which_children(Pid)),
+        ?assertMatch([{sense_ted_notices, P, worker, _}, {tender_intake, I, worker, _},
+                      {mcl_tenders_group_keys, undefined, worker, _}]
+                       when is_pid(P) andalso is_pid(I), supervisor:which_children(Pid)),
         unlink(Pid),
-        exit(Pid, shutdown)
+        stopped(Pid)
     end).
 
 %% The release takes the realm name from the environment: the fact topic and

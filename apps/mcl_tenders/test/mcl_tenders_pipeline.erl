@@ -3,14 +3,14 @@
 %%% the SQLite read model, the query store, and mcl_om's identity holding the
 %%% realm, so every desk and responder runs as it does on a node.
 %%%
-%%% Shared by mcl_tenders_read_side_tests, mcl_tenders_wire_replies_tests and
-%%% mcl_tenders_no_profile_in_logs_tests.
+%%% Shared by mcl_tenders_read_side_tests, mcl_tenders_dossier_tests,
+%%% mcl_tenders_wire_replies_tests and mcl_tenders_no_profile_in_logs_tests.
 -module(mcl_tenders_pipeline).
 
 -include_lib("reckon_db/include/reckon_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([start/1, stop/1, realm/0, eventually/2, call/3]).
+-export([start/1, stop/1, realm/0, eventually/2, call/3, reported/1]).
 
 %% Synthetic: this repository is public.
 -define(REALM_NAME, <<"io.example">>).
@@ -86,3 +86,20 @@ plain_keys(List) when is_list(List) -> [plain_keys(V) || V <- List];
 plain_keys(Other) -> Other.
 
 key({text, K}) -> K.
+
+%% @doc One `tender_notice_reported_v1' fact through the process manager's
+%% decision, as it arrives from the realm's sensor, with the realm, the profile
+%% and the desks all live. The day's intake admits it: tender_intake's own
+%% tests hold the cap.
+-spec reported(map()) -> {atom(), term()}.
+reported(Fact) ->
+    on_tender_notice_reported_v1_maybe_spot_tender:handled(
+      Fact, #{realm => fun mcl_om:realm/0,
+              profile => fun get_tender_profile:find/1,
+              admit => fun() -> ok end,
+              noted => fun() -> ok end,
+              dispatch => fun dispatched/2}).
+
+dispatched(spot_tender, Cmd) -> maybe_spot_tender:dispatch(Cmd);
+dispatched(amend_tender, Cmd) -> maybe_amend_tender:dispatch(Cmd);
+dispatched(note_tender_award, Cmd) -> maybe_note_tender_award:dispatch(Cmd).
