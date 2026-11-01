@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 760" role="img" aria-label="mcl-tenders system context">
+<title>mcl-tenders system context</title>
+<style>
+.t-name { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 700; }
+.t-desc { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; }
+.t-rel { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 11.5px; paint-order: stroke; stroke-width: 4px; stroke-linejoin: round; }
+.t-code { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; }
+.t-type { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+.t-bound { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 600; }
+.t-leg { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12px; }
+.edge { fill: none; stroke-width: 1.25; }
+.edge-later { fill: none; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bg { fill: #FFFFFF; }
+.b-sys { fill: #F5E9CC; stroke: #A56F0A; stroke-width: 2; }
+.b-per { fill: #E3EBF2; stroke: #3B5B7A; stroke-width: 1.25; }
+.b-mac { fill: #E6E4EE; stroke: #5E5A78; stroke-width: 1.25; }
+.b-ext { fill: #ECEFED; stroke: #8A9791; stroke-width: 1.25; }
+.b-cmp { fill: #FFFFFF; stroke: #8A9791; stroke-width: 1.25; }
+.b-later { fill: none; stroke: #8A9791; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.bound { fill: none; stroke: #B3BDB8; stroke-width: 1; }
+.head { fill: #3B5B7A; }
+.t-name, .t-code { fill: #16201D; }
+.t-type, .t-bound, .t-leg { fill: #66736E; }
+.t-desc { fill: #34413C; }
+.t-rel { fill: #66736E; stroke: #FFFFFF; }
+.edge, .edge-later { stroke: #8A9791; }
+.arrowhead { fill: #8A9791; }
+@media (prefers-color-scheme: dark) {
+.bg { fill: #171F1C; }
+.b-sys { fill: #3A2E13; stroke: #E3AA3C; }
+.b-per { fill: #1D2A36; stroke: #8EB4D8; }
+.b-mac { fill: #26243A; stroke: #A9A4C8; }
+.b-ext { fill: #1C2421; stroke: #7D8B85; }
+.b-cmp { fill: #171F1C; stroke: #7D8B85; }
+.b-later { stroke: #7D8B85; }
+.bound { stroke: #4A5752; }
+.head { fill: #8EB4D8; }
+.t-name, .t-code { fill: #E6ECE9; }
+.t-type, .t-bound, .t-leg { fill: #93A09A; }
+.t-desc { fill: #C3CDC8; }
+.t-rel { fill: #93A09A; stroke: #171F1C; }
+.edge, .edge-later { stroke: #7D8B85; }
+.arrowhead { fill: #7D8B85; }
+}
+</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
+<rect class="bg" x="0" y="0" width="1000" height="760"/>
+<rect class="b-per" x="40" y="30" width="270" height="120" rx="10"/>
+<circle class="head" cx="66" cy="54" r="9"/>
+<text class="t-name" x="84" y="58">Bid team</text>
+<text class="t-type" x="84" y="76">[Person]</text>
+<text class="t-desc" x="56" y="100">The company's own people: they set</text>
+<text class="t-desc" x="56" y="116">the profile and work each tender,</text>
+<text class="t-desc" x="56" y="132">in a browser on the company LAN</text>
+<rect class="b-per" x="365" y="30" width="270" height="120" rx="10"/>
+<circle class="head" cx="391" cy="54" r="9"/>
+<text class="t-name" x="409" y="58">Realm operator</text>
+<text class="t-type" x="409" y="76">[Person]</text>
+<text class="t-desc" x="381" y="100">Deploys mcl-tenders in the realm</text>
+<text class="t-desc" x="381" y="116">and grants the tenders role to the</text>
+<text class="t-desc" x="381" y="132">people and agents who may use it</text>
+<rect class="b-ext" x="690" y="30" width="270" height="120" rx="10"/>
+<text class="t-name" x="706" y="58">Company agent</text>
+<text class="t-type" x="706" y="76">[External system, optional]</text>
+<text class="t-desc" x="706" y="100">An agent of the same realm, holding</text>
+<text class="t-desc" x="706" y="116">the tenders role; reads notice text</text>
+<text class="t-desc" x="706" y="132">as data, never as instructions</text>
+<rect class="bound" x="345" y="186" width="310" height="244" rx="12"/>
+<text class="t-bound" x="361" y="420">Company realm</text>
+<rect class="b-sys" x="365" y="214" width="270" height="170" rx="10"/>
+<text class="t-name" x="381" y="242">mcl-tenders</text>
+<text class="t-type" x="381" y="260">[Erlang umbrella, one release]</text>
+<text class="t-desc" x="381" y="284">Fetches the tender notices that fit</text>
+<text class="t-desc" x="381" y="300">the realm's own profile, guides each</text>
+<text class="t-desc" x="381" y="316">from spotted to bid, won or lost,</text>
+<text class="t-desc" x="381" y="332">and keeps the profile and the work</text>
+<text class="t-desc" x="381" y="348">on the realm's own node</text>
+<rect class="b-ext" x="720" y="240" width="250" height="120" rx="10"/>
+<text class="t-name" x="736" y="268">TED Search API</text>
+<text class="t-type" x="736" y="286">[External system]</text>
+<text class="t-desc" x="736" y="310">Anonymous, no key. Sees the</text>
+<text class="t-desc" x="736" y="326">realm's CPV codes and countries</text>
+<text class="t-desc" x="736" y="342">in its query, nothing more</text>
+<rect class="b-later" x="30" y="240" width="250" height="120" rx="10"/>
+<text class="t-name" x="46" y="268">TenderNed</text>
+<text class="t-type" x="46" y="286">[External system, later: #6]</text>
+<text class="t-desc" x="46" y="310">The Dutch platform, as a</text>
+<text class="t-desc" x="46" y="326">second source of the same</text>
+<text class="t-desc" x="46" y="342">notices; needs credentials</text>
+<rect class="b-mac" x="365" y="470" width="270" height="120" rx="10"/>
+<text class="t-name" x="381" y="498">macula-realm</text>
+<text class="t-type" x="381" y="516">[Macula infrastructure]</text>
+<text class="t-desc" x="381" y="540">The trust anchor: membership,</text>
+<text class="t-desc" x="381" y="556">the tenders role, and the org</text>
+<text class="t-desc" x="381" y="572">delegation the group key rests on</text>
+<rect class="b-mac" x="690" y="470" width="270" height="120" rx="10"/>
+<text class="t-name" x="706" y="498">Macula stations, mesh DHT</text>
+<text class="t-type" x="706" y="516">[Macula infrastructure]</text>
+<text class="t-desc" x="706" y="540">Carry the sealed fact between the</text>
+<text class="t-desc" x="706" y="556">realm's nodes; they see a topic</text>
+<text class="t-desc" x="706" y="572">and a size, never a notice</text>
+<rect class="b-later" x="40" y="470" width="270" height="120" rx="10"/>
+<text class="t-name" x="56" y="498">Company mail server</text>
+<text class="t-type" x="56" y="516">[External system, later: #5]</text>
+<text class="t-desc" x="56" y="540">Gets the morning digest only</text>
+<text class="t-desc" x="56" y="556">when an owner switches it on,</text>
+<text class="t-desc" x="56" y="572">straight from the node</text>
+<path class="edge" d="M175 150V170H400V214" marker-end="url(#a)"/>
+<text class="t-rel" x="183" y="166">sets the profile, works tenders, on the LAN</text>
+<path class="edge" d="M500 150V214" marker-end="url(#a)"/>
+<text class="t-rel" x="508" y="196">deploys, grants</text>
+<path class="edge" d="M825 150V170H600V214" marker-end="url(#a)"/>
+<text class="t-rel" x="817" y="166" text-anchor="end">sealed calls</text>
+<path class="edge" d="M635 300H720" marker-end="url(#a)"/>
+<text class="t-rel" x="677" y="292" text-anchor="middle">by date,</text>
+<text class="t-rel" x="677" y="318" text-anchor="middle">CPV, country</text>
+<path class="edge-later" d="M365 300H280" marker-end="url(#a)"/>
+<text class="t-rel" x="322" y="292" text-anchor="middle">later</text>
+<path class="edge" d="M460 384V470" marker-end="url(#a)"/>
+<text class="t-rel" x="468" y="456">role, delegation</text>
+<path class="edge" d="M600 384V445H825V470" marker-end="url(#a)"/>
+<text class="t-rel" x="640" y="462">sealed fact, inside the realm</text>
+<path class="edge-later" d="M365 365H325V450H175V470" marker-end="url(#a)"/>
+<text class="t-rel" x="183" y="444">digest, opt-in</text>
+<text class="t-desc" x="40" y="636">The realm is the trust boundary: each realm runs its own mcl-tenders, and no sensor is shared between realms. The profile,</text>
+<text class="t-desc" x="40" y="654">the matches and the pursuits stay on the realm's node. TED sees the CPV codes and countries the query names; the stations</text>
+<text class="t-desc" x="40" y="672">see that the realm uses the service, never which notices reached it. Keywords, exclusions and the description never leave.</text>
+<rect class="b-sys" x="24" y="700" width="22" height="14" rx="3"/>
+<text class="t-leg" x="54" y="712">In scope</text>
+<rect class="b-per" x="110.8" y="700" width="22" height="14" rx="3"/>
+<text class="t-leg" x="140.8" y="712">Person</text>
+<rect class="b-mac" x="184.39999999999998" y="700" width="22" height="14" rx="3"/>
+<text class="t-leg" x="214.39999999999998" y="712">Macula infrastructure</text>
+<rect class="b-ext" x="357.0" y="700" width="22" height="14" rx="3"/>
+<text class="t-leg" x="387.0" y="712">External system</text>
+<rect class="b-cmp" x="490.0" y="700" width="22" height="14" rx="3"/>
+<text class="t-leg" x="520.0" y="712">Container or component</text>
+<rect class="bound" x="669.2" y="700" width="22" height="14" rx="3"/>
+<text class="t-leg" x="699.2" y="712">Boundary</text>
+</svg>
