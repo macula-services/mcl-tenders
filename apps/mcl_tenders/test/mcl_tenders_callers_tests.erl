@@ -1,4 +1,4 @@
-%%% @doc T2: who may call the profile's procedures, decided by macula's own gate.
+%%% @doc T2: who may call the service's procedures, decided by macula's own gate.
 %%%
 %%% Each procedure declares `{callers, role}' and `confidential => required'
 %%% (mcl_tenders_service). macula resolves `{callers, role}' against the realm
@@ -33,10 +33,10 @@ callers_test_() ->
          lists:append([per_procedure(Name, Other, P) || {Name, Other} <- pairs()])
      end}.
 
-%% Each procedure with the other one, whose grant must not admit it.
+%% Each procedure with the next one, round, whose grant must not admit it.
 pairs() ->
-    [Describe, Get] = [N || #{name := N} <- mcl_tenders_service:capabilities()],
-    [{Describe, Get}, {Get, Describe}].
+    [First | Rest] = Names = [N || #{name := N} <- mcl_tenders_service:capabilities()],
+    lists:zip(Names, Rest ++ [First]).
 
 per_procedure(Name, Other, #{realm_key := RealmKey, other_realm_key := OtherKey,
                              holder_id := Caller}) ->

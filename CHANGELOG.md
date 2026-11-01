@@ -7,7 +7,20 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Unreleased
 
-Refs macula-services/mcl-tenders#2 and #3.
+Refs macula-services/mcl-tenders#2, #3 and #4.
+
+- **The morning list** (#4, first step). Each reported contract notice or
+  prior information notice that fits the realm's profile gets a dossier
+  (`tender_aggregate`, `spot_tender`); corrections (`amend_tender`) and the
+  award (`note_tender_award`) fold into it, and the bid team dismisses a tender
+  with `dismiss_tender`, which records the caller. The fit is keywords only for
+  now: country, CPV hierarchy, exclusions, keywords; similarity to the
+  profile's description comes later. Every notice is read again on arrival and
+  trusts none of the fact's text. New sealed procedures for the tenders role:
+  `get_tenders_page` (best first) and `get_tender_by_id`. At most
+  `MCL_TENDERS_DAILY_CAP` (500) tenders are spotted a day; `/health` info shows
+  `intake`, `sensor` and `quiet`. The process manager is not yet subscribed to
+  the sensor's facts: that waits for mcl_om 1.7.0 (macula-services/mcl-om#48).
 
 - **The sensor joins the release** (`sense_tender_notices`, under
   `mcl_tenders_sup`; the separate sensor app is gone). Each sweep reads the
