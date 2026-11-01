@@ -5,9 +5,9 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-11-02
 
-Refs macula-services/mcl-tenders#11.
+Refs macula-services/mcl-tenders#11 and #15.
 
 - **The realm can archive its profile** (`archive_tender_profile`, a sealed
   procedure for the tenders role, like the other two). The realm stops looking
@@ -19,6 +19,16 @@ Refs macula-services/mcl-tenders#11.
   `tenders.sqlite3`: at boot the store applies each schema step above the
   file's `PRAGMA user_version`, in a transaction, and a second boot changes
   nothing. This release adds `archived_at` and `archived_by`.
+- **A failed read model step says which, and changes nothing.** The store
+  stops with `{migration_failed, Version, SQLite's error}` and the file keeps
+  its rows and its version; a step is all or nothing. It closes its
+  connection when it stops.
+- **An older release refuses a newer read model.** A file whose
+  `user_version` is above the last step this release knows (an older image on
+  a newer file) stops the store with `{schema_newer_than_release, File, Known}`
+  instead of being served.
+- README: archive is granted on its own, like every procedure, so a realm can
+  keep it in fewer hands than describe.
 
 ## [0.1.1] - 2026-11-02
 
