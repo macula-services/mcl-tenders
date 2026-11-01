@@ -23,12 +23,13 @@
 %%% out a timeout per notice of a 3,800-notice day helps nobody.
 %%%
 %%% Where it moves to: past the week, when the whole week lies before today, as
-%%% those days are complete. Otherwise to the newest day read, so that day is
-%%% read ONCE more and what TED had not yet indexed at this sweep is reported by
-%%% the next (the window drops the rest); a sweep that read nothing newer than
-%%% its own `since' moves past it. So a release day costs two reads, not one per
-%%% sweep until the next release: every realm runs a sensor, and TED pays for
-%%% each of them. It holds no store: on a restart
+%%% those days are complete. Otherwise to the newest day read, AS LONG AS that
+%%% sweep reported something new of that day: the next sweep reads it again, and
+%%% what TED had not yet indexed is reported then (the window drops the rest).
+%%% A sweep that finds nothing new of its newest day moves past it. So a release
+%%% day costs two reads in the steady state, whether `since' sat on that day
+%%% before its release or behind it, not one per sweep until the next release:
+%%% every realm runs a sensor, and TED pays for each of them. It holds no store: on a restart
 %%% `since' starts again from today, and a day reported again is harmless,
 %%% because company nodes deduplicate.
 %%%
@@ -149,6 +150,7 @@ interested({idle, Why}, _Since, _Today, Window, _Deps) ->
 interested({ok, Cpv, Countries}, Since, Today, Window, Deps) ->
     Last = calendar:gregorian_days_to_date(calendar:date_to_gregorian_days(Since) + ?SPAN_DAYS - 1),
     Acc = #{since => Since, last => Last, today => Today, window => Window, newest => none,
+            fresh => none,
             reported => 0, already_reported => 0, skipped => 0},
     page(request(Since, Last, Cpv, Countries), 1, Acc, Deps).
 
@@ -194,18 +196,16 @@ finished(#{window := W} = Acc) ->
     {ok, next_since(Acc), W, maps:with([reported, already_reported, skipped], Acc)}.
 
 %% A week wholly before today is complete: the next sweep starts after it.
-%% Otherwise a newest day past `since' is read once more, as TED may still have
-%% been adding to it; a newest day that is `since' itself was that second read,
-%% and the next sweep starts after it. An empty sweep leaves `since'.
+%% Otherwise the newest day is read again while a sweep still reports something
+%% new of it, as TED may still be adding to it; a sweep that reported nothing
+%% new of its newest day was that second read, and the next sweep starts after
+%% it, whether or not `since' already sat on that day. An empty sweep leaves
+%% `since'.
 next_since(#{last := Last, today := Today}) when Last < Today ->
     calendar:gregorian_days_to_date(calendar:date_to_gregorian_days(Last) + 1);
 next_since(#{since := Since, newest := none}) -> Since;
-next_since(#{since := Since, last := Last, newest := Newest}) ->
-    From = calendar:date_to_gregorian_days(Since),
-    calendar:gregorian_days_to_date(min(read_again(From, Newest), calendar:date_to_gregorian_days(Last))).
-
-read_again(From, Newest) when Newest > From -> Newest;
-read_again(From, _ReadTwice) -> From + 1.
+next_since(#{newest := Newest, fresh := Newest}) -> calendar:gregorian_days_to_date(Newest);
+next_since(#{newest := Newest}) -> calendar:gregorian_days_to_date(Newest + 1).
 
 ingest_all([], Acc, _Report) -> {ok, Acc};
 ingest_all([Json | Rest], Acc, Report) -> continued(ingest(Json, Acc, Report), Rest, Report).
@@ -213,28 +213,41 @@ ingest_all([Json | Rest], Acc, Report) -> continued(ingest(Json, Acc, Report), R
 continued({ok, Acc}, Rest, Report) -> ingest_all(Rest, Acc, Report);
 continued({error, _Reason, _W} = Stopped, _Rest, _Report) -> Stopped.
 
-ingest(Json, Acc, Report) when is_map(Json) ->
-    parsed(parse_ted_notice:parse(Json), newest(parse_ted_notice:publication_day(Json), Acc), Report);
+ingest(Json, #{last := Last} = Acc, Report) when is_map(Json) ->
+    Day = within(gregorian(parse_ted_notice:publication_day(Json)), calendar:date_to_gregorian_days(Last)),
+    parsed(parse_ted_notice:parse(Json), Day, latest(newest, Day, Acc), Report);
 ingest(_NotAnObject, #{skipped := S} = Acc, _Report) ->
     {ok, Acc#{skipped := S + 1}}.
 
-newest(none, Acc) -> Acc;
-newest(Day, #{newest := none} = Acc) -> Acc#{newest := calendar:date_to_gregorian_days(Day)};
-newest(Day, #{newest := N} = Acc) -> Acc#{newest := max(N, calendar:date_to_gregorian_days(Day))}.
+gregorian(none) -> none;
+gregorian(Day) -> calendar:date_to_gregorian_days(Day).
 
-parsed({skip, _Why}, #{skipped := S} = Acc, _Report) ->
+%% A notice dated past the week asked for counts as its last day, so it never
+%% moves `since' beyond the week.
+within(none, _Last) -> none;
+within(Day, Last) -> min(Day, Last).
+
+%% The newest day read (`newest'), or the newest day of a notice reported new
+%% in this sweep (`fresh').
+latest(_Key, none, Acc) -> Acc;
+latest(Key, Day, Acc) -> later(maps:get(Key, Acc), Key, Day, Acc).
+
+later(none, Key, Day, Acc) -> Acc#{Key := Day};
+later(Was, Key, Day, Acc) -> Acc#{Key := max(Was, Day)}.
+
+parsed({skip, _Why}, _Day, #{skipped := S} = Acc, _Report) ->
     {ok, Acc#{skipped := S + 1}};
-parsed({ok, #{publication_number := Number} = Notice}, #{window := W} = Acc, Report) ->
-    reported(reported_window:seen(Number, W), Notice, Acc, Report).
+parsed({ok, #{publication_number := Number} = Notice}, Day, #{window := W} = Acc, Report) ->
+    reported(reported_window:seen(Number, W), Notice, Day, Acc, Report).
 
-reported(true, _Notice, #{already_reported := A} = Acc, _Report) ->
+reported(true, _Notice, _Day, #{already_reported := A} = Acc, _Report) ->
     {ok, Acc#{already_reported := A + 1}};
-reported(false, Notice, Acc, Report) ->
-    marked(Report(Notice), Notice, Acc).
+reported(false, Notice, Day, Acc, Report) ->
+    marked(Report(Notice), Notice, Day, Acc).
 
-marked(ok, #{publication_number := Number}, #{window := W, reported := R} = Acc) ->
-    {ok, Acc#{window := reported_window:mark(Number, W), reported := R + 1}};
-marked({error, Reason}, _Notice, #{window := W}) ->
+marked(ok, #{publication_number := Number}, Day, #{window := W, reported := R} = Acc) ->
+    {ok, latest(fresh, Day, Acc#{window := reported_window:mark(Number, W), reported := R + 1})};
+marked({error, Reason}, _Notice, _Day, #{window := W}) ->
     {error, {report_failed, Reason}, W}.
 
 %%------------------------------------------------------------------------------

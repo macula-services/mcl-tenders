@@ -132,8 +132,10 @@ as codes again before they reach the query, whatever the read model holds.
 
 **It stays idle**, asking TED nothing, while the realm has no profile with at
 least one CPV code and one country, or while the node cannot seal what it would
-report (see Configuration). Idle, it starts again from today when the profile
-or the setup arrives, not from the day the node first booted. It logs the reason
+report (see Configuration). Idle, it starts again from today (less
+`MCL_TENDERS_LOOKBACK_DAYS`) when the profile or the setup arrives, not from
+the day the node first booted: a profile set in the afternoon reads that
+day's release, not the days before it. It logs the reason
 once each time it changes, naming variables, never values.
 
 **Sealed, inside the realm.** Because the sensor asks for the realm's own codes,
@@ -167,8 +169,9 @@ own identity; the payload names no sender.
 moves on only when every one of them was reported. The first failed publish, or
 a page TED refuses, ends the sweep and leaves its days in place; the next sweep
 reports what is still missing, without repeating what already went out. The
-newest day is read once more by the next sweep, in case TED was still adding
-to it, so a release day costs two reads, not one per sweep. A sensor far behind
+newest day is read again by the next sweep while a sweep still finds something
+new of it, in case TED was still adding to it, so a release day costs two
+reads in the steady state, not one per sweep. A sensor far behind
 catches up a week per sweep. A failed sweep doubles the wait before the next
 one, up to six hours, because TED does answer `429` to a burst.
 
@@ -217,7 +220,7 @@ expiring row.
 | `MCL_TENDERS_POLL_MS` | `900000` | How often TED is swept, in milliseconds. |
 | `MCL_TENDERS_MAX_SEEN` | `30000` | How many publication numbers are remembered, so a notice is never reported twice: about eight release days. |
 | `MCL_TENDERS_LOOKBACK_DAYS` | `0` | How many days before today a fresh sensor starts from. `0` reports today's release and on. |
-| `MCL_GROUP_ORG_KEY_ID` | unset | The 64-hex id of the `mcl-tenders` org key, from the realm's org directory. Without it the node serves no group key and the sensor stays idle. |
+| `MCL_GROUP_ORG_KEY_ID` | unset | The 64-hex id of the `mcl-tenders` org key, from the realm's org directory. Without it the node serves no group key and the sensor stays idle. A value that is not exactly 64 hex characters stops the node at boot, naming the variable: a short id would match nothing while `/health` said ok. |
 | `MCL_TENDERS_GROUP_UCAN` | unset | **A secret.** This node's grant to pull the tenders group's key, minted by the realm operator. Without it the sensor stays idle. It is read at the moment of a publish and never logged. Keep it in the box's env file, never in git. |
 
 **The group grant is interim** (macula-services/mcl-om#48). Today the realm

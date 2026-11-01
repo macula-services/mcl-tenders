@@ -14,8 +14,9 @@ Refs macula-services/mcl-tenders#2 and #3.
   realm's profile in process and asks TED only for its CPV codes and countries,
   never a keyword, an exclusion or the description. It stays idle while the
   realm has no profile with a code and a country, or while the node cannot seal.
-  The newest day is read once more by the next sweep, so a release day costs
-  two TED reads instead of one per sweep.
+  The newest day is read again while a sweep still finds something new of it,
+  also when `since` already sat on that day, so a release day costs two TED
+  reads in the steady state instead of one per sweep.
 - **Sealed inside the realm.** `tender_notice_reported_v1` travels under the
   realm's tenders group (`<realm name>/mcl-tenders/tenders`), and the release
   runs the group's distributor itself (`group_keys_v1`). Admission is interim:
