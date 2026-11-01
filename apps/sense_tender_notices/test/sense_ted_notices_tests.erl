@@ -43,7 +43,9 @@ deps(Search, Report) -> #{search => Search, report => Report, pause => fun() -> 
 window() -> reported_window:new(1000).
 
 sweep(Search, Report) -> sweep(Search, Report, window()).
+%% Tests share one process: what an earlier sweep sent is drained first.
 sweep(Search, Report, Window) ->
+    _ = {reported(), searched()},
     sense_ted_notices:sweep(?SINCE, Window, deps(Search, Report)).
 
 reported() -> drain(reported, []).
