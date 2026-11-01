@@ -1,0 +1,22 @@
+{application, guide_tender_lifecycle, [
+    {description, "CMD: the process, from the realm's tenders profile to each tender it pursues (tenderprofile-{digest} stream)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        %% The responder implements macula_response and reads its payload
+        %% through mcl_om_wire.
+        macula,
+        mcl_om,
+        %% The desks dispatch through evoq into mcl_tenders_store, which
+        %% mcl_tenders opens before the service boots.
+        evoq,
+        reckon_evoq
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

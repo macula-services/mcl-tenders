@@ -1,0 +1,6 @@
+# Advisories this repository waives, one row each. No baseline: every row is a
+# decision with a reason, an owner and an expiry, and the scan fails on an
+# expired one (macula-ci-images dependency-advisories.yml).
+#
+# advisory | package | why it cannot be fixed yet | owner | expires YYYY-MM-DD
+EEF-CVE-2026-43966 | cowlib | no fixed release: every cowlib from 2.9.0 is affected and the fix (ninenines/cowlib 4401b858) is unreleased; the flaw is in serialising a structured-header string, which cowlib reaches only from cow_http_hd variant-key and wt-protocol builders, which nothing here calls (cowlib comes only through mcl_om's cowboy, serving its fixed /health reply). Take the first cowlib release carrying the fix | uranus | 2026-12-01
