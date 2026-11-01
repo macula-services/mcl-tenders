@@ -106,10 +106,38 @@ a_complete_sweep_moves_since_to_the_newest_day_test() ->
 the_newest_day_is_read_once_more_and_then_left_test() ->
     P1 = [notice(<<"1-2026">>, <<"2026-10-29">>)],
     {ok, Next, W, _} = sweep(pages([P1]), reporting(ok)),
+    ?assertEqual({2026, 10, 29}, Next),
+    ?assertMatch({ok, {2026, 10, 30}, _, #{reported := 0, already_reported := 1}},
+                 sweep(Next, pages([P1]), reporting(ok), W)).
+
+%% TED still adding to the newest day at the second read: what it added is
+%% reported, and the day is read again until a read finds nothing new of it.
+a_day_still_growing_is_read_until_nothing_new_test() ->
+    P1 = [notice(<<"1-2026">>, <<"2026-10-29">>)],
+    {ok, Next, W, _} = sweep(pages([P1]), reporting(ok)),
+    _ = reported(),
     P2 = [notice(<<"1-2026">>, <<"2026-10-29">>), notice(<<"2-2026">>, <<"2026-10-29">>)],
-    ?assertMatch({ok, {2026, 10, 30}, _, #{reported := 1, already_reported := 1}},
-                 sweep(Next, pages([P2]), reporting(ok), W)),
-    ?assertEqual([<<"2-2026">>], reported()).
+    {ok, Next2, W2, Stats} = sweep(Next, pages([P2]), reporting(ok), W),
+    ?assertEqual({{2026, 10, 29}, #{reported => 1, already_reported => 1, skipped => 0}},
+                 {Next2, Stats}),
+    ?assertEqual([<<"2-2026">>], reported()),
+    ?assertMatch({ok, {2026, 10, 30}, _, #{reported := 0}}, sweep(Next2, pages([P2]), reporting(ok), W2)).
+
+%% THE STEADY STATE (Pluto, PR #7 r1): `since' already sits on the day being
+%% released, as it does after every quiet sweep. Its release is read twice all
+%% the same: the first read finds it new and stays, the second finds nothing
+%% new and moves on. What TED indexed between the two reads is not lost.
+the_release_of_the_day_since_sits_on_is_read_twice_test() ->
+    Day = {2026, 10, 30},
+    ?assertMatch({ok, Day, _, #{reported := 0}}, sweep(Day, pages([]), reporting(ok), window())),
+    P1 = [notice(<<"1-2026">>, <<"2026-10-30">>)],
+    {ok, Next, W, _} = sweep(Day, pages([P1]), reporting(ok), window()),
+    ?assertEqual({Day, [<<"1-2026">>]}, {Next, reported()}),
+    P2 = [notice(<<"1-2026">>, <<"2026-10-30">>), notice(<<"2-2026">>, <<"2026-10-30">>)],
+    {ok, Next2, W2, _} = sweep(Next, pages([P2]), reporting(ok), W),
+    ?assertEqual({Day, [<<"2-2026">>]}, {Next2, reported()}),
+    ?assertMatch({ok, {2026, 10, 31}, _, #{reported := 0, already_reported := 2}},
+                 sweep(Next2, pages([P2]), reporting(ok), W2)).
 
 %% A sensor far behind (a long lookback, a mesh dark for weeks) reads one week
 %% per sweep and moves past it, so it catches up rather than asking for more
@@ -156,9 +184,11 @@ a_failed_report_ends_the_sweep_and_is_retried_by_the_next_test() ->
     ?assertMatch({error, {report_failed, mesh_unavailable}, _}, sweep(pages([P1]), Flaky)),
     {error, _, W} = sweep(pages([P1]), Flaky),
     ?assertEqual([<<"1-2026">>], reported()),
-    ?assertMatch({ok, {2026, 10, 29}, _, #{reported := 2, already_reported := 1}},
-                 sweep(pages([P1]), reporting(ok), W)),
-    ?assertEqual([<<"2-2026">>, <<"3-2026">>], reported()).
+    {ok, Next, W2, Stats} = sweep(pages([P1]), reporting(ok), W),
+    ?assertEqual({?SINCE, #{reported => 2, already_reported => 1, skipped => 0}}, {Next, Stats}),
+    ?assertEqual([<<"2-2026">>, <<"3-2026">>], reported()),
+    %% It found new notices of its newest day, so that day is read once more.
+    ?assertMatch({ok, {2026, 10, 29}, _, #{reported := 0}}, sweep(pages([P1]), reporting(ok), W2)).
 
 %% A page TED refuses ends the sweep: since stays, and the window keeps what
 %% was reported before the refusal.
