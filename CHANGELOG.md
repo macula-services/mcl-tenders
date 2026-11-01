@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-11-02
+
+Refs macula-services/mcl-tenders#12.
+
+- **The release assembles.** v0.1.0's image was never built: `rebar3 as prod
+  release` refused `sense_ted_notices`, a name both `sense_tender_notices` and
+  `mcl_tenders` declared as theirs. It is the sensor app's alone now. 0.1.1 is
+  0.1.0 as it was meant to ship.
+- CI assembles the prod release on every change, so a release relx refuses
+  fails the pull request, not the tag.
+
 ## [0.1.0] - 2026-11-02
 
 Refs macula-services/mcl-tenders#2 and #3.
