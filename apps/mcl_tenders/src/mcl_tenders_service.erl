@@ -85,7 +85,8 @@ health() -> ok.
 %% answered by <name>_responder; README, "Procedures", is the contract. And,
 %% once the org key id is known, the tenders group's distributor.
 capabilities() ->
-    [procedure(Name) || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>]]
+    [procedure(Name) || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>,
+                                 <<"archive_tender_profile">>]]
         ++ group_keys(tender_notices_group:org_key_id()).
 
 %% macula's advertise_opts/0: `auth => handler_authorizes', which runs no gate

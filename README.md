@@ -43,11 +43,12 @@ Two slices are built: **the realm's tenders profile**, and **the sensor** that
 reads TED for it. The release boots, joins the mesh, opens its own event store
 and answers `/health` on its Unix socket, `/run/mcl/health.sock` inside the
 container. The profile is born the first time mcl-tenders boots in a realm, and
-is already there on every boot after.
+is already there on every boot after. Archiving it ends the realm's search: the
+sensor idles from then on, and nothing more is recorded on it.
 
 | Division | Desks | Dossier or read model |
 |----------|-------|-----------------------|
-| `guide_tender_lifecycle` (CMD) | `initiate_tender_profile` (at boot), `describe_tender_profile` | the realm's profile, keyed by the realm |
+| `guide_tender_lifecycle` (CMD) | `initiate_tender_profile` (at boot), `describe_tender_profile`, `archive_tender_profile` | the realm's profile, keyed by the realm |
 | `project_tenders` (PRJ) | one projection per event | `tenders.sqlite3`: the profile |
 | `query_tenders` (QRY) | `get_tender_profile` | reads `tenders.sqlite3` |
 | `sense_tender_notices` (sensor) | `sense_ted_notices` | none: it reports facts, sealed |
@@ -58,9 +59,9 @@ sets the profile.
 
 ## Procedures
 
-Both procedures are CALLs that **require a sealed call**: the node names its KEM
+All three procedures are CALLs that **require a sealed call**: the node names its KEM
 key and macula's link refuses a call in the clear, so the profile crosses a
-station only as ciphertext. Both admit **only the tenders role**
+station only as ciphertext. Each admits **only the tenders role**
 (`auth => {callers, role}`): an identity holding a capability the realm minted
 for that procedure. A bare realm member, or a node of another realm, is refused
 by the link before any handler runs. Each replies with its answer, or
@@ -71,6 +72,7 @@ the wire contract.
 |-----------|---------|--------|
 | `mcl-tenders/describe_tender_profile` | `{"cpv_codes"?: [...], "countries"?: [...], "keywords"?: [...], "exclusions"?: [...], "description"?}` | `{}`: replaces the whole profile; a field left out is empty |
 | `mcl-tenders/get_tender_profile` | `{}` | `{cpv_codes, countries, keywords, exclusions, description, described_by, described_at}` |
+| `mcl-tenders/archive_tender_profile` | `{}` | `{}`: the realm stops looking for tenders; final, the caller recorded as who archived it |
 
 `described_by` is the 64-hex node id of the caller that described it last,
 `described_at` milliseconds since the epoch. The lists come back sorted, without
@@ -89,6 +91,8 @@ here change.
 | `invalid_description` | the same text rule, up to 4000 bytes, line breaks allowed |
 | `not_initiated` | the profile is not there yet; the release initiates it at boot |
 | `not_found` | no profile to read yet |
+| `archived` | the profile is archived: it is not read, and not described again |
+| `already_archived` | the profile was archived before |
 | `no_caller` | the CALL carried no 32-byte node id |
 | `no_realm` | the node has no realm, so it serves no profile |
 | `store_unavailable`, `internal_error` | the service's own fault; its log names the fault, never the profile |
@@ -107,7 +111,8 @@ under a logger that keeps every event, including a stuck and a crashing store,
 and fails if a canary turns up.
 
 Known limits. The realm is the trust boundary: anyone the realm grants the
-tenders role reads and replaces the whole profile. Events are permanent: a
+tenders role reads and replaces the whole profile, and can archive it, which
+cannot be undone. Events are permanent: a
 description, once given, stays in the event store after it is replaced, even
 though no query shows it. Back the store up as you would the bid strategy it
 holds.
@@ -131,7 +136,7 @@ codes by hierarchy, so `72000000` brings `72315000` too. The codes are checked
 as codes again before they reach the query, whatever the read model holds.
 
 **It stays idle**, asking TED nothing, while the realm has no profile with at
-least one CPV code and one country, or while the node cannot seal what it would
+least one CPV code and one country, once the profile is archived, or while the node cannot seal what it would
 report (see Configuration). Idle, it starts again from today (less
 `MCL_TENDERS_LOOKBACK_DAYS`) when the profile or the setup arrives, not from
 the day the node first booted: a profile set in the afternoon reads that

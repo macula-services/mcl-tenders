@@ -281,6 +281,8 @@ interest_in({ok, #{cpv_codes := Cpv, countries := Countries}}) ->
     narrowed(codes(Cpv, ?CPV), codes(Countries, ?COUNTRY));
 interest_in({error, not_found}) ->
     {idle, no_profile};
+interest_in({error, archived}) ->
+    {idle, archived};
 interest_in({error, Reason}) ->
     {idle, {profile_unreadable, Reason}}.
 
