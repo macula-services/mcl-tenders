@@ -20,7 +20,6 @@ Refs macula-services/mcl-tenders#11.
   file's `PRAGMA user_version`, in a transaction, and a second boot changes
   nothing. This release adds `archived_at` and `archived_by`.
 
-||||||| b339064
 ## [0.1.1] - 2026-11-02
 
 Refs macula-services/mcl-tenders#12.
