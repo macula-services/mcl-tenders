@@ -3,11 +3,14 @@
 %%% Keywords and exclusions are matched against notice text, and shown back to
 %%% the bid team, which is where an invisibly padded or reversed term would
 %%% match nothing or mislead. So text is normalised to NFC first (lengths count
-%%% the normalised bytes), and refused when it is not UTF-8 or carries a control
-%%% character (C0, DEL, C1) or an invisible format character: bidi embeddings,
-%%% overrides and isolates, zero-width spaces and joiners, word joiners and
-%%% invisible operators, line and paragraph separators, the BOM, the soft
-%%% hyphen, the Arabic letter mark and the Mongolian vowel separator.
+%%% the normalised bytes), and refused when it is not UTF-8 or carries a
+%%% character of one of these Unicode general categories: Cc (control: C0,
+%%% DEL, C1), Cf (format: bidi embeddings, overrides and isolates, zero-width
+%%% spaces and joiners, the BOM, the soft hyphen, the tag block, the
+%%% interlinear annotation marks and every other invisible format character),
+%%% Zl and Zp (line and paragraph separators), and Cn (unassigned, which no
+%%% term needs and a future version may give a meaning). The set is the
+%%% categories as OTP's regular expressions know them, not a list kept by hand.
 %%%
 %%% `lines' allows one control character, the line feed, for the description.
 %%% @end
@@ -23,25 +26,15 @@ checked(_Other, _Min, _Max, _Lines) ->
     error.
 
 normalised(Nfc, Lines) when is_binary(Nfc) ->
-    plain(lists:all(fun(C) -> allowed(C, Lines) end, unicode:characters_to_list(Nfc)), Nfc);
+    plain(re:run(Nfc, refused(Lines), [unicode, ucp, {capture, none}]), Nfc);
 normalised(_Malformed, _Lines) ->
     error.
 
-plain(true, Nfc) -> {ok, Nfc};
-plain(false, _Nfc) -> error.
+plain(nomatch, Nfc) -> {ok, Nfc};
+plain(match, _Nfc) -> error.
 
 sized({ok, Nfc}, Min, Max) when byte_size(Nfc) >= Min, byte_size(Nfc) =< Max -> {ok, Nfc};
 sized(_, _Min, _Max) -> error.
 
-allowed($\n, lines) -> true;
-allowed(C, _Lines) -> allowed(C).
-
-allowed(C) when C < 16#20; C >= 16#7F, C =< 16#9F -> false;
-allowed(16#AD) -> false;
-allowed(16#61C) -> false;
-allowed(16#180E) -> false;
-allowed(C) when C >= 16#200B, C =< 16#200F -> false;
-allowed(C) when C >= 16#2028, C =< 16#202E -> false;
-allowed(C) when C >= 16#2060, C =< 16#206F -> false;
-allowed(16#FEFF) -> false;
-allowed(_) -> true.
+refused(line) -> <<"[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}\\p{Cn}]">>;
+refused(lines) -> <<"[^\\n\\P{Cc}]|[\\p{Cf}\\p{Zl}\\p{Zp}\\p{Cn}]">>.

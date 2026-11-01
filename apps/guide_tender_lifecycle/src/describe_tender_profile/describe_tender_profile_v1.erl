@@ -12,7 +12,8 @@
 %%%     tender_profile_text allows it. They never leave the node.
 %%%   - `description': 0 to 4000 NFC bytes, lines allowed. Never leaves the node.
 %%%
-%%% Codes are sorted and deduplicated. `described_by' is the caller's node id,
+%%% Every list is sorted and deduplicated, text after NFC, so one term
+%%% written two ways is kept once. `described_by' is the caller's node id,
 %%% kept so the realm can see who last changed what it bids for.
 %%% @end
 -module(describe_tender_profile_v1).
@@ -113,7 +114,8 @@ first_refusal([], Realm, By, #{cpv_codes := Cpv, countries := Countries, keyword
     {ok, #describe_tender_profile_v1{realm = Realm, described_by = By,
                                      cpv_codes = lists:usort(Cpv),
                                      countries = lists:usort(Countries),
-                                     keywords = Keywords, exclusions = Exclusions,
+                                     keywords = lists:usort(Keywords),
+                                     exclusions = lists:usort(Exclusions),
                                      description = Description}}.
 
 listed(List, Max, Check) when is_list(List), length(List) =< Max ->

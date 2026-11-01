@@ -12,8 +12,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/macula-full-dark.svg">
-    <img src="assets/macula-full-light.svg" alt="Macula" width="320">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/macula-tenders-full-dark.svg">
+    <img src="assets/macula-tenders-full-light.svg" alt="Macula Tenders" width="320">
   </picture>
 </p>
 
@@ -96,6 +96,9 @@ service.
 **The profile never reaches a log.** It says what the realm bids for, so it
 lives on the node's disk, in the event store and the read model, and nowhere
 else: not in a log line, not in a crash report, not in the aggregate's state.
+One exception stays inside the node: an event a projection cannot apply is
+dead-lettered, and evoq keeps that letter, profile and all, in the node's
+memory until it restarts; it is never logged.
 `mcl_tenders_no_profile_in_logs_tests` runs every profile path with canary terms
 under a logger that keeps every event, including a stuck and a crashing store,
 and fails if a canary turns up.
@@ -135,9 +138,11 @@ expiring row.
 | `MACULA_STATION_SEEDS` | required | Station hosts to dial, `host[:port]`, comma-separated. |
 | `MACULA_STATION_NODE_IDS` | required | The matching 64-hex station node ids, index-paired with the seeds. mcl_om refuses to boot a pool with an unpinned seed. |
 | `MCL_DATA_DIR` | `/data` in the image | Where the event store and `tenders.sqlite3` live. The image declares `/data` a volume; mount it on a bulk drive. |
-| `MCL_NODE_NAME` | `mcl_tenders` | Erlang node name. |
-| `MCL_NODE_HOST` | `127.0.0.1` | Erlang node host. |
-| `MCL_COOKIE` | `mcl_tenders` | Erlang cookie. |
+
+The node takes no Erlang node connections: no epmd, no distribution
+listener, no cookie (`config/vm.args.src`), so `remote_console` and `eval` do
+not work against it, by design. Ask it how it is with `scripts/health.sh`, which
+reads `/health` on its Unix socket. It writes no crash dump either.
 
 `deploy/docker-compose.yml` runs it, and carries what the service knows about
 itself. If you deploy through something else, let that carry placement: which
