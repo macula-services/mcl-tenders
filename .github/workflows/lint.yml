@@ -1,0 +1,90 @@
+# Structural lint, unit tests and dialyzer, in the SAME digest-pinned image
+# the Containerfile's builder stage uses, so CI tests the toolchain that
+# ships: OTP 28.4.3 with ML-DSA, rebar3, Rust (macula's NIFs always build
+# from source) and a C toolchain, all from the image, none installed here.
+
+name: lint-and-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # build-push.yml calls it, so no image is built from a red commit.
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: ["ubuntu-latest"]
+    container:
+      # ⚠ THE SAME IMAGE AS THE Containerfile's builder, by digest. The service
+      # tests guard that the two agree and that the step below refuses
+      # anything but 28.4.3.
+      image: ghcr.io/macula-io/macula-ci-otp:20260928-1800@sha256:7318a443021f8a4ceb7ad56b0ab21f52db95db92996ea0f0897a1eff0b678832
+    steps:
+      # BEFORE checkout, so an image missing git (checkout would fall back to
+      # the REST API, with no real clone and no tags) or any other tool the
+      # build needs fails here, naming it, rather than a later step failing
+      # on its absence. mcl_om's template suite runs the block between the
+      # markers in this image (scripts/is_lint_toolchain_runnable.sh).
+      - name: Verify the toolchain is the one we think it is
+        run: |
+          # toolchain-begin
+          git --version
+          openssl version
+          rebar3 version
+          rustc --version
+          cargo --version
+          erl -noshell -eval '
+            Otp = string:trim(element(2, file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])))),
+            Mldsa = lists:member(mldsa87, crypto:supports(public_keys)),
+            io:format("OTP ~s, mldsa87 ~p~n", [Otp, Mldsa]),
+            case {Otp, Mldsa} of
+                {<<"28.4.3">>, true} -> halt(0);
+                _                    -> halt(1)
+            end.'
+          # toolchain-end
+      - uses: actions/checkout@v4
+      - run: rebar3 lint
+      - run: rebar3 eunit
+      - run: rebar3 dialyzer
+
+  # scripts/promote_latest.sh, the one step that moves :latest, is only ever run
+  # by a release. This runs it on every change, against a registry of its own,
+  # so a broken promotion shows here and not on a tag (macula-services/mcl-jobs#9).
+  promote-latest-copies-the-signed-digest:
+    runs-on: ["ubuntu-latest"]
+    services:
+      registry:
+        image: docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/promote_latest_test.sh
+        env:
+          REGISTRY: localhost:5000
+
+  # A dependency the release ships with a published advisory fails this, and so
+  # the image: build-push.yml's build waits on this workflow (macula-services/mcl-jobs#6,
+  # macula-codebase-checks#11). Erlang reads the resolved rebar.lock as an
+  # SBOM, to osv-scanner. No baseline: an advisory is fixed, or waived in
+  # .github/advisories-waivers.txt by a dated, named, expiring row.
+  #
+  # A HOSTED RUNNER, because this repository is public; `--user 1001:1001' is
+  # that runner's own user, since the shared workflow refuses uid 0.
+  #
+  # THE IMAGE IS NEWER THAN check's, ON PURPOSE (20261031-2106 against
+  # 20260928-1800): the scan is a Python script and the older image has no
+  # python3. Both run OTP 28.4.3 and rebar3 3.27.0 (checked by running each),
+  # so the lock this scans resolves as the release resolves it. Unifying the
+  # two pins moves the Containerfile's builder, a release change of its own.
+  advisories:
+    name: Dependency advisories
+    permissions:
+      contents: read
+    uses: macula-io/macula-ci-images/.github/workflows/dependency-advisories.yml@553b29210236d200149735c7805050f3b94a8965
+    with:
+      ecosystem: erlang
+      container: ghcr.io/macula-io/macula-ci-otp:20261031-2106@sha256:f2532c6ad37c2c0194937b4a0aafc2fcfa4e32e734602fae782f764a94f9cd99
+      container-options: '--user 1001:1001'
