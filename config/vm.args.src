@@ -1,6 +1,14 @@
-## Node identity and runtime flags for mcl_tenders.
--name ${MCL_NODE_NAME}@${MCL_NODE_HOST}
--setcookie ${MCL_COOKIE}
+## Runtime flags for mcl_tenders.
+
+## NO ERLANG DISTRIBUTION LISTENER. The service talks to the mesh, never to
+## another Erlang node, and answers /health on a Unix socket. relx's start
+## script demands a node name, so the node has a short one, but it starts no
+## epmd and never listens for a node connection, and it has no cookie: no
+## remote shell or dist-eval can reach the process that holds the realm's
+## profile and the node key (T2, T8; macula-services/mcl-om#24).
+-sname mcl_tenders
+-start_epmd false
+-dist_listen false
 
 +K true
 

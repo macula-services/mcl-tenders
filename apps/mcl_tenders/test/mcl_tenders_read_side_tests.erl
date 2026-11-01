@@ -17,7 +17,8 @@ read_side_test_() ->
       {timeout, 60, fun a_new_description_replaces_the_old/0},
       {timeout, 60, fun a_refused_description_changes_nothing/0},
       {timeout, 60, fun a_replayed_older_description_changes_nothing/0},
-      {timeout, 60, fun the_read_needs_a_realm_id/0}]}.
+      {timeout, 60, fun the_read_needs_a_realm_id/0},
+      {timeout, 60, fun the_read_model_is_a_write_ahead_log/0}]}.
 
 realm() -> mcl_tenders_pipeline:realm().
 
@@ -87,3 +88,10 @@ a_replayed_older_description_changes_nothing() ->
 the_read_needs_a_realm_id() ->
     ?assertEqual({error, invalid_realm}, get_tender_profile:find(<<"io.example">>)),
     ?assertEqual({error, not_found}, get_tender_profile:find(<<16#99:256>>)).
+
+%% WAL, so the reader and the writer do not lock each other out, and both wait
+%% a moment for a lock instead of answering store_unavailable at once.
+the_read_model_is_a_write_ahead_log() ->
+    ?assertEqual([[<<"wal">>]], tenders_query_store:q("PRAGMA journal_mode", [])),
+    ?assertEqual([[2000]], tenders_query_store:q("PRAGMA busy_timeout", [])),
+    ?assertEqual([[2000]], tenders_read_model_store:q("PRAGMA busy_timeout", [])).

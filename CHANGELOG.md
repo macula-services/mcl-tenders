@@ -21,5 +21,14 @@ Refs macula-services/mcl-tenders#3.
   image). Lint and tests run on hosted runners in the pinned builder image,
   with the shared dependency-advisories scan; an image is built only when both
   are green, and only a signed release moves `:latest`.
-- **README and C4.** The service README template, and a Level 3 component
-  diagram of the slice in `architecture/README.md`.
+- **README and C4.** The service README template with its own Macula Tenders
+  logo, and a Level 3 component diagram of the slice in
+  `architecture/README.md`.
+- **No Erlang distribution.** The node starts no epmd, listens for no node
+  connection and has no cookie; the image writes no crash dump. Nothing can
+  attach to the process that holds the profile (macula-services/mcl-om#24).
+- **Profile text.** Every list is sorted and deduplicated after NFC, and the
+  refused characters are whole Unicode categories (Cc, Cf, Zl, Zp, Cn), the tag
+  block and the annotation marks among them.
+- **Read model in WAL**, with a lock wait on both connections, so a reader
+  never answers `store_unavailable` for a lock the writer holds a moment.

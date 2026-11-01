@@ -25,6 +25,16 @@ codes_are_sorted_and_deduplicated_test() ->
     ?assertEqual([<<"48000000">>, <<"72000000">>], get(cpv_codes, Cmd)),
     ?assertEqual([<<"BEL">>, <<"NLD">>], get(countries, Cmd)).
 
+%% Every list, not only the codes: one term written twice, or twice in two
+%% normal forms, is one term.
+keywords_and_exclusions_are_sorted_and_deduplicated_test() ->
+    Decomposed = <<"Cafe", 16#cc, 16#81>>,
+    Composed = <<"Caf", 16#c3, 16#a9>>,
+    Cmd = new(#{keywords => [<<"b">>, <<"a">>, <<"a">>, Decomposed, Composed],
+                exclusions => [<<"z">>, <<"z">>]}),
+    ?assertEqual([Composed, <<"a">>, <<"b">>], get(keywords, Cmd)),
+    ?assertEqual([<<"z">>], get(exclusions, Cmd)).
+
 a_cpv_code_is_eight_digits_test_() ->
     [?_assertEqual({error, invalid_cpv_codes}, new(#{cpv_codes => [Bad]}))
      || Bad <- [<<"7200000">>, <<"720000000">>, <<"72000000-6">>, <<"7200000a">>,
@@ -69,6 +79,10 @@ invisible_and_control_characters_are_refused_test_() ->
            <<16#ef, 16#bb, 16#bf, "bom">>,               %% U+FEFF
            <<"line", 16#e2, 16#80, 16#a8, "sep">>,       %% U+2028
            <<"soft", 16#c2, 16#ad, "hyphen">>,           %% U+00AD
+           <<"a", 16#f3, 16#a0, 16#81, 16#81>>,          %% U+E0041 tag latin capital A
+           <<"ann", 16#ef, 16#bf, 16#b9, "ot">>,         %% U+FFF9 interlinear annotation anchor
+           <<"ann", 16#ef, 16#bf, 16#bb, "ot">>,         %% U+FFFB interlinear annotation terminator
+           <<"un", 16#e2, 16#81, 16#a5, "set">>,         %% U+2065, unassigned
            <<"tab\there">>, <<"cr\r">>, <<16#c2, 16#85>>, <<255>>],
     [?_assertEqual({error, invalid_keywords}, new(#{keywords => [B]})) || B <- Bad] ++
     [?_assertEqual({error, invalid_exclusions}, new(#{exclusions => [B]})) || B <- Bad] ++

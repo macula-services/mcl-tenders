@@ -34,8 +34,13 @@ q(Sql, Args) ->
 init(SqlitePath) ->
     opened(esqlite3:open(SqlitePath)).
 
-opened({ok, Conn}) -> {ok, #state{conn = Conn}};
+%% The writer set the file to WAL; this connection waits for a lock rather
+%% than answer SQLITE_BUSY, which a reader would see as store_unavailable.
+opened({ok, Conn}) -> waiting(esqlite3:exec(Conn, "PRAGMA busy_timeout=2000"), Conn);
 opened({error, Reason}) -> {stop, {open_failed, Reason}}.
+
+waiting(ok, Conn) -> {ok, #state{conn = Conn}};
+waiting({error, Reason}, _Conn) -> {stop, {pragma_failed, Reason}}.
 
 handle_call({q, Sql, Args}, _From, #state{conn = Conn} = State) ->
     {reply, queried(Conn, Sql, Args), State};

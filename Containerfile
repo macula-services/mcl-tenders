@@ -68,9 +68,14 @@ COPY --from=builder /build/_build/prod/rel/mcl_tenders ./
 ENV HOME=/app
 ENV RELX_REPLACE_OS_VARS=true
 
-ENV MCL_NODE_NAME=mcl_tenders
-ENV MCL_NODE_HOST=127.0.0.1
-ENV MCL_COOKIE=mcl_tenders
+# NO ERLANG DISTRIBUTION LISTENER (vm.args.src): no cookie, no epmd, and
+# -dist_listen false, so nothing accepts a node connection. The release's
+# remote_console and eval need one, so they do not work against this node,
+# by design: it holds the realm's profile.
+
+# NO CRASH DUMP. A dump copies every process heap, where the profile passes
+# on its way to the read model; 0 makes the VM write none (T8).
+ENV ERL_CRASH_DUMP_SECONDS=0
 
 ENV MCL_DATA_DIR=/data
 

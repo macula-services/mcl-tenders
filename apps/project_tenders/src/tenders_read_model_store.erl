@@ -77,7 +77,7 @@ init(SqlitePath) ->
     ok = filelib:ensure_dir(SqlitePath),
     opened(esqlite3:open(SqlitePath)).
 
-opened({ok, Conn}) -> schemed(Conn, create_schema(Conn, schema()));
+opened({ok, Conn}) -> schemed(Conn, create_schema(Conn, pragmas() ++ schema()));
 opened({error, Reason}) -> {stop, {open_failed, Reason}}.
 
 schemed(Conn, ok) -> {ok, #state{conn = Conn}};
@@ -123,6 +123,13 @@ queried(Conn, Sql, Args) ->
     try esqlite3:q(Conn, Sql, Args)
     catch Class:Reason -> {error, {sqlite_raised, Class, without_arguments(Reason)}}
     end.
+
+%% WRITE-AHEAD LOG, so query_tenders' own connection reads while this one
+%% writes, and a short wait rather than SQLITE_BUSY when they meet, which
+%% would answer a reader store_unavailable for a lock held a millisecond.
+%% WAL is a property of the file and stays set.
+pragmas() ->
+    ["PRAGMA journal_mode=WAL", "PRAGMA busy_timeout=2000"].
 
 create_schema(Conn, [Sql | Rest]) -> next_ddl(esqlite3:exec(Conn, Sql), Conn, Rest);
 create_schema(_Conn, []) -> ok.
