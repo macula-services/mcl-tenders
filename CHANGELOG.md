@@ -7,8 +7,26 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Unreleased
 
-Refs macula-services/mcl-tenders#3.
+Refs macula-services/mcl-tenders#2 and #3.
 
+- **The sensor joins the release** (`sense_tender_notices`, under
+  `mcl_tenders_sup`; the separate sensor app is gone). Each sweep reads the
+  realm's profile in process and asks TED only for its CPV codes and countries,
+  never a keyword, an exclusion or the description. It stays idle while the
+  realm has no profile with a code and a country, or while the node cannot seal.
+  The newest day is read once more by the next sweep, so a release day costs
+  two TED reads instead of one per sweep.
+- **Sealed inside the realm.** `tender_notice_reported_v1` travels under the
+  realm's tenders group (`<realm name>/mcl-tenders/tenders`), and the release
+  runs the group's distributor itself (`group_keys_v1`). Admission is interim:
+  a hand-minted grant in `MCL_TENDERS_GROUP_UCAN`, checked against
+  `MCL_GROUP_ORG_KEY_ID`, until the realm's tenders role replaces it
+  (macula-services/mcl-om#48). Without either the node never publishes, and
+  the token is never logged.
+- **New configuration:** `MCL_REALM_NAME` (checked against `MCL_REALM` at
+  boot), `MCL_TENDERS_POLL_MS`, `MCL_TENDERS_MAX_SEEN`,
+  `MCL_TENDERS_LOOKBACK_DAYS`, `MCL_GROUP_ORG_KEY_ID`,
+  `MCL_TENDERS_GROUP_UCAN`. `/health` info says `sealing: set` or `unset`.
 - **The realm's tenders profile.** The first slice of the release:
   `guide_tender_lifecycle` (the `tender_profile` dossier, initiated at boot and
   described through `describe_tender_profile`), `project_tenders` (its

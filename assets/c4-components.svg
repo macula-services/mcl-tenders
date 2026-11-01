@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1000" role="img" aria-label="mcl-tenders components: the profile slice">
-<title>mcl-tenders components: the profile slice</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1450 1000" role="img" aria-label="mcl-tenders components: the profile slice and the sensor">
+<title>mcl-tenders components: the profile slice and the sensor</title>
 <style>
 .t-name { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 700; }
 .t-desc { font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; }
@@ -44,7 +44,7 @@
 }
 </style>
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0 0L10 5L0 10z"/></marker></defs>
-<rect class="bg" x="0" y="0" width="1100" height="1000"/>
+<rect class="bg" x="0" y="0" width="1450" height="1000"/>
 <rect class="b-per" x="50" y="30" width="300" height="120" rx="10"/>
 <circle class="head" cx="76" cy="54" r="9"/>
 <text class="t-name" x="94" y="58">Tenders role holder</text>
@@ -62,8 +62,8 @@
 <text class="t-type" x="766" y="76">[Macula infrastructure]</text>
 <text class="t-desc" x="766" y="100">Mints the tenders role and</text>
 <text class="t-desc" x="766" y="116">anchors the realm's identity</text>
-<rect class="bound" x="30" y="190" width="1040" height="640" rx="12"/>
-<text class="t-bound" x="46" y="820">mcl-tenders [one release]: the profile slice</text>
+<rect class="bound" x="30" y="190" width="1390" height="640" rx="12"/>
+<text class="t-bound" x="46" y="820">mcl-tenders [one release]: the profile slice and the sensor</text>
 <rect class="b-cmp" x="50" y="230" width="300" height="150" rx="10"/>
 <text class="t-code" x="66" y="258">describe_tender_profile_responder</text>
 <text class="t-type" x="66" y="276">[guide_tender_lifecycle]</text>
@@ -103,7 +103,7 @@
 <text class="t-type" x="766" y="476">[query_tenders, QRY]</text>
 <text class="t-desc" x="766" y="500">find/1 by realm, through</text>
 <text class="t-desc" x="766" y="516">tenders_query_store. The sensor</text>
-<text class="t-desc" x="766" y="532">will read it here, in process.</text>
+<text class="t-desc" x="766" y="532">reads it here, in process.</text>
 <rect class="b-cmp" x="50" y="630" width="300" height="150" rx="10"/>
 <text class="t-code" x="66" y="658">mcl_tenders_store</text>
 <text class="t-type" x="66" y="676">[ReckonDB, embedded]</text>
@@ -114,8 +114,34 @@
 <text class="t-type" x="416" y="676">[SQLite read model]</text>
 <text class="t-desc" x="416" y="700">The profile, one row per realm,</text>
 <text class="t-desc" x="416" y="716">shaped for get_tender_profile</text>
+<rect class="b-ext" x="1100" y="30" width="300" height="120" rx="10"/>
+<text class="t-name" x="1116" y="58">TED Search API</text>
+<text class="t-type" x="1116" y="76">[External system]</text>
+<text class="t-desc" x="1116" y="100">Anonymous, no key. Sees the</text>
+<text class="t-desc" x="1116" y="116">realm's CPV codes and countries</text>
+<rect class="b-cmp" x="1100" y="430" width="300" height="150" rx="10"/>
+<text class="t-code" x="1116" y="458">sense_ted_notices</text>
+<text class="t-type" x="1116" y="476">[sense_tender_notices, sensor]</text>
+<text class="t-desc" x="1116" y="500">Reads the profile each sweep,</text>
+<text class="t-desc" x="1116" y="516">asks TED for its codes and</text>
+<text class="t-desc" x="1116" y="532">countries, reports each new</text>
+<text class="t-desc" x="1116" y="548">notice, sealed in the realm.</text>
+<rect class="b-cmp" x="1100" y="630" width="300" height="150" rx="10"/>
+<text class="t-code" x="1116" y="658">mcl_tenders_group_keys</text>
+<text class="t-type" x="1116" y="676">[macula_group_keys, distributor]</text>
+<text class="t-desc" x="1116" y="700">Hands the tenders group's key</text>
+<text class="t-desc" x="1116" y="716">to nodes with the org's grant.</text>
+<text class="t-desc" x="1116" y="732">Not started without</text>
+<text class="t-desc" x="1116" y="748">MCL_GROUP_ORG_KEY_ID.</text>
 <path class="edge" d="M350 90H400" marker-end="url(#a)"/>
 <text class="t-rel" x="375" y="82" text-anchor="middle">call</text>
+<path class="edge" d="M1100 505H1050" marker-end="url(#a)"/>
+<text class="t-rel" x="1075" y="497" text-anchor="middle">find/1</text>
+<path class="edge" d="M1250 430V150" marker-end="url(#a)"/>
+<text class="t-rel" x="1258" y="290">days, CPV codes,</text>
+<text class="t-rel" x="1258" y="306">countries</text>
+<path class="edge" d="M1250 580V630" marker-end="url(#a)"/>
+<text class="t-rel" x="1258" y="610">pulls the group key</text>
 <path class="edge" d="M750 90H700" marker-end="url(#a)"/>
 <text class="t-rel" x="725" y="82" text-anchor="middle">role</text>
 <path class="edge" d="M450 150V205H200V230" marker-end="url(#a)"/>
@@ -138,7 +164,8 @@
 <text class="t-rel" x="908" y="650">reads</text>
 <text class="t-desc" x="50" y="870">The profile says what the realm bids for, so it lives on the node's disk, in the event store and the read model, and</text>
 <text class="t-desc" x="50" y="888">nowhere else: not in a log, not in a crash report, not in the aggregate's state. Both procedures are sealed and admit</text>
-<text class="t-desc" x="50" y="906">only identities the realm granted the tenders role. The sensor and the dossier (#7, #4) come next, on this same release.</text>
+<text class="t-desc" x="50" y="906">only identities the realm granted the tenders role. The sensor asks TED for the profile's codes and countries only, and its</text>
+<text class="t-desc" x="50" y="924">facts travel sealed under the realm's tenders group, to the dossier (#4) that comes next on this same release.</text>
 <rect class="b-sys" x="24" y="940" width="22" height="14" rx="3"/>
 <text class="t-leg" x="54" y="952">In scope</text>
 <rect class="b-per" x="110.8" y="940" width="22" height="14" rx="3"/>

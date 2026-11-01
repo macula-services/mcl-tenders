@@ -229,14 +229,14 @@ def containers():
 
 
 def components():
-    d = Diagram("c4-components.svg", "mcl-tenders components: the profile slice", 1100, 1000)
+    d = Diagram("c4-components.svg", "mcl-tenders components: the profile slice and the sensor", 1450, 1000)
     d.box("b-per", 50, 30, 300, 120, "Tenders role holder", "[Person or agent of the realm]",
           ["Describes or reads the realm's", "profile through a sealed call"], person=True)
     d.box("b-mac", 400, 30, 300, 120, "macula link", "[library, on this node]",
           ["Refuses a call in the clear, and", "a caller without the tenders role,", "before any handler runs"])
     d.box("b-mac", 750, 30, 300, 120, "macula-realm", "[Macula infrastructure]",
           ["Mints the tenders role and", "anchors the realm's identity"])
-    d.bound(30, 190, 1040, 640, "mcl-tenders [one release]: the profile slice", bottom=True)
+    d.bound(30, 190, 1390, 640, "mcl-tenders [one release]: the profile slice and the sensor", bottom=True)
     d.box("b-cmp", 50, 230, 300, 150, "describe_tender_profile_responder", "[guide_tender_lifecycle]",
           ["Checks every field: CPV codes,", "countries, keywords, exclusions,", "a description. The caller is",
            "the one who described it."], code=True)
@@ -252,13 +252,24 @@ def components():
           ["One projection per event, through", "tenders_read_model_store, which", "keeps no argument in a crash",
            "report or a log."], code=True)
     d.box("b-cmp", 750, 430, 300, 150, "get_tender_profile", "[query_tenders, QRY]",
-          ["find/1 by realm, through", "tenders_query_store. The sensor", "will read it here, in process."],
+          ["find/1 by realm, through", "tenders_query_store. The sensor", "reads it here, in process."],
           code=True)
     d.box("b-cmp", 50, 630, 300, 150, "mcl_tenders_store", "[ReckonDB, embedded]",
           ["Every event of the profile, on", "this node's disk under /data"], code=True)
     d.box("b-cmp", 400, 630, 300, 150, "tenders.sqlite3", "[SQLite read model]",
           ["The profile, one row per realm,", "shaped for get_tender_profile"], code=True)
+    d.box("b-ext", 1100, 30, 300, 120, "TED Search API", "[External system]",
+          ["Anonymous, no key. Sees the", "realm's CPV codes and countries"])
+    d.box("b-cmp", 1100, 430, 300, 150, "sense_ted_notices", "[sense_tender_notices, sensor]",
+          ["Reads the profile each sweep,", "asks TED for its codes and", "countries, reports each new",
+           "notice, sealed in the realm."], code=True)
+    d.box("b-cmp", 1100, 630, 300, 150, "mcl_tenders_group_keys", "[macula_group_keys, distributor]",
+          ["Hands the tenders group's key", "to nodes with the org's grant.", "Not started without",
+           "MCL_GROUP_ORG_KEY_ID."], code=True)
     d.edge("M350 90H400"); d.text("t-rel", 375, 82, "call", anchor="middle")
+    d.edge("M1100 505H1050"); d.text("t-rel", 1075, 497, "find/1", anchor="middle")
+    d.edge("M1250 430V150"); d.text("t-rel", 1258, 290, "days, CPV codes,"); d.text("t-rel", 1258, 306, "countries")
+    d.edge("M1250 580V630"); d.text("t-rel", 1258, 610, "pulls the group key")
     d.edge("M750 90H700"); d.text("t-rel", 725, 82, "role", anchor="middle")
     d.edge("M450 150V205H200V230"); d.text("t-rel", 208, 200, "describe_tender_profile")
     d.edge("M650 150V205H900V230"); d.text("t-rel", 892, 200, "get_tender_profile", anchor="end")
@@ -271,7 +282,8 @@ def components():
     d.edge("M900 580V705H700"); d.text("t-rel", 908, 650, "reads")
     d.text("t-desc", 50, 870, "The profile says what the realm bids for, so it lives on the node's disk, in the event store and the read model, and")
     d.text("t-desc", 50, 888, "nowhere else: not in a log, not in a crash report, not in the aggregate's state. Both procedures are sealed and admit")
-    d.text("t-desc", 50, 906, "only identities the realm granted the tenders role. The sensor and the dossier (#7, #4) come next, on this same release.")
+    d.text("t-desc", 50, 906, "only identities the realm granted the tenders role. The sensor asks TED for the profile's codes and countries only, and its")
+    d.text("t-desc", 50, 924, "facts travel sealed under the realm's tenders group, to the dossier (#4) that comes next on this same release.")
     d.legend(940)
     d.write()
 
