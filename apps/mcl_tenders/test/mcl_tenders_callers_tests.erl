@@ -1,4 +1,4 @@
-%%% @doc T2: who may call the profile's procedures, decided by macula's own gate.
+%%% @doc T2: who may call the service's procedures, decided by macula's own gate.
 %%%
 %%% Each procedure declares `{callers, role}' and `confidential => required'
 %%% (mcl_tenders_service). macula resolves `{callers, role}' against the realm

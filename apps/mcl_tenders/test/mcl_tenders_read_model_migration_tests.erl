@@ -45,7 +45,9 @@ cleanup(Path) ->
 
 a_0_1_0_read_model_is_brought_forward_keeping_its_rows(Path) ->
     booted(Path, fun() ->
-        ?assertEqual([[1]], tenders_read_model_store:q("PRAGMA user_version", [])),
+        ?assertEqual([[2]], tenders_read_model_store:q("PRAGMA user_version", [])),
+        %% The morning list's table is there, empty, beside the kept profile.
+        ?assertEqual([[0]], tenders_read_model_store:q("SELECT count(*) FROM tenders", [])),
         ?assertEqual([[<<"5e">>, 7, <<"BEL">>, 3, undefined, <<>>]],
                      tenders_read_model_store:q(
                        "SELECT realm, initiated_at, countries, described_version, archived_at,"
@@ -54,7 +56,7 @@ a_0_1_0_read_model_is_brought_forward_keeping_its_rows(Path) ->
 
 a_second_boot_changes_nothing(Path) ->
     booted(Path, fun() ->
-        ?assertEqual([[1]], tenders_read_model_store:q("PRAGMA user_version", [])),
+        ?assertEqual([[2]], tenders_read_model_store:q("PRAGMA user_version", [])),
         ?assertEqual([[<<"5e">>, undefined]],
                      tenders_read_model_store:q("SELECT realm, archived_at FROM tender_profiles", []))
     end).

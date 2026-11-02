@@ -57,7 +57,7 @@
 -module(sense_ted_notices).
 -behaviour(gen_server).
 
--export([start_link/0, sweep/4, interest_in/1, delay/2, first_day/2, positive_int/2]).
+-export([start_link/0, status/0, sweep/4, interest_in/1, delay/2, first_day/2, positive_int/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(SEARCH_URL, "https://api.ted.europa.eu/v3/notices/search").
@@ -87,6 +87,20 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+%% @doc How the sensor is: `idle' (naming why, never a value) or `sweeping',
+%% and when a sweep last read every page it asked for (0: not since the node
+%% started). The morning list shows it, so a quiet stream is told apart from
+%% a sensor that cannot reach TED (T5).
+%%
+%% Read from a persistent_term, not asked of the process: a sweep of many pages
+%% keeps the process busy for minutes, and the morning list must not wait on
+%% it. Written when the idle reason changes and after each whole sweep, a few
+%% times an hour at most.
+-spec status() -> {ok, #{state := idle | sweeping, idle_reason := term(),
+                         last_swept_at := non_neg_integer()}} | {error, unavailable}.
+status() ->
+    persistent_term:get(?MODULE, {error, unavailable}).
+
 init([]) ->
     _ = application:ensure_all_started(inets),
     _ = application:ensure_all_started(ssl),
@@ -96,8 +110,11 @@ init([]) ->
     Since = first_day(Today, Lookback),
     logger:info("[tenders] sensor up: TED since ~ts, sweep every ~bs", [day(Since), PollMs div 1000]),
     self() ! sweep,
-    {ok, #{since => Since, poll_ms => PollMs, failures => 0, lookback => Lookback, idle => none,
-           window => reported_window:new(setting("MCL_TENDERS_MAX_SEEN", max_seen, ?DEFAULT_MAX_SEEN))}}.
+    St = #{since => Since, poll_ms => PollMs, failures => 0, lookback => Lookback, idle => none,
+           last_swept_at => 0,
+           window => reported_window:new(setting("MCL_TENDERS_MAX_SEEN", max_seen, ?DEFAULT_MAX_SEEN))},
+    ok = post(St),
+    {ok, St}.
 
 handle_call(_Req, _From, St) -> {reply, {error, unknown_call}, St}.
 handle_cast(_Msg, St)        -> {noreply, St}.
@@ -105,6 +122,7 @@ handle_cast(_Msg, St)        -> {noreply, St}.
 handle_info(sweep, #{since := Since, window := W} = St) ->
     {Today, _Time} = calendar:universal_time(),
     St2 = swept(sweep(Since, Today, W, live()), Today, St),
+    ok = posted(St, St2),
     erlang:send_after(delay(maps:get(poll_ms, St2), maps:get(failures, St2)), self(), sweep),
     {noreply, St2};
 handle_info(_Info, St) ->
@@ -118,6 +136,16 @@ swept({idle, Why, W}, Today, #{lookback := Lookback, idle := Was} = St) ->
 swept(Swept, _Today, St) ->
     swept(Swept, St#{idle := none}).
 
+%% The status/0 term, written only when it changed.
+posted(#{idle := I, last_swept_at := A}, #{idle := I, last_swept_at := A}) -> ok;
+posted(_Was, St) -> post(St).
+
+post(#{idle := Idle, last_swept_at := At}) ->
+    persistent_term:put(?MODULE, {ok, #{state => state(Idle), idle_reason => Idle, last_swept_at => At}}).
+
+state(none) -> sweeping;
+state(_Why) -> idle.
+
 idle_noted(Same, Same) -> ok;
 idle_noted(Why, _Was) -> logger:notice("[tenders] sensor idle, TED not asked: ~0p", [Why]).
 
@@ -125,7 +153,7 @@ swept({ok, Next, W, Stats}, #{since := Since} = St) ->
     logger:info("[tenders] swept TED since ~ts: ~b reported, ~b already reported, ~b not reported",
                 [day(Since), maps:get(reported, Stats), maps:get(already_reported, Stats),
                  maps:get(skipped, Stats)]),
-    St#{since := Next, window := W, failures := 0};
+    St#{since := Next, window := W, failures := 0, last_swept_at := erlang:system_time(millisecond)};
 swept({error, Reason, W}, #{since := Since, failures := F} = St) ->
     logger:notice("[tenders] sweep of TED since ~ts stopped: ~0p", [day(Since), Reason]),
     St#{window := W, failures := F + 1}.

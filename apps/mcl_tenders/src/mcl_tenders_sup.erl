@@ -1,5 +1,5 @@
 %% @doc Supervises this service's own processes: the tenders group's
-%% distributor, then the TED sensor.
+%% distributor, today's intake count of spotted tenders, then the TED sensor.
 %%
 %% The desks run inside evoq's aggregate processes, and the read side is
 %% supervised by project_tenders and query_tenders, each its own application.
@@ -20,6 +20,10 @@ init([]) ->
              start => {mcl_tenders_group_keys, start_link, []},
              restart => permanent, shutdown => 5000, type => worker,
              modules => [mcl_tenders_group_keys]},
+           #{id => tender_intake,
+             start => {tender_intake, start_link, []},
+             restart => permanent, shutdown => 5000, type => worker,
+             modules => [tender_intake]},
            #{id => sense_ted_notices,
              start => {sense_ted_notices, start_link, []},
              restart => permanent, shutdown => 5000, type => worker,

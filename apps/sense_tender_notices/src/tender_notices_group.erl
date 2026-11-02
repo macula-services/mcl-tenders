@@ -27,7 +27,7 @@
 %%% form a log line or an error term would print.
 -module(tender_notices_group).
 
--export([org/0, prefix/1, missing/0, org_key_id/0, publish_opts/2, publish_opts/3]).
+-export([org/0, prefix/1, missing/0, org_key_id/0, admission/0, publish_opts/2, publish_opts/3]).
 
 -define(ORG, <<"mcl-tenders">>).
 -define(TOKEN_VAR, "MCL_TENDERS_GROUP_UCAN").
@@ -65,6 +65,16 @@ hex_32(_WrongLength) -> error({mcl_tenders_group, {not_64_hex, ?ORG_KEY_VAR}}).
 
 decoded(<<_:256>> = Id) -> Id;
 decoded(_NotHex) -> error({mcl_tenders_group, {not_64_hex, ?ORG_KEY_VAR}}).
+
+%% @doc The admission token a subscription under the group presents, read at
+%% the moment mcl_om asks for it (once per subscribe attempt), so it sits in
+%% no state: `{ok, Token}', or `{error, no_admission_token}' while the deploy
+%% has not set it, which mcl_om names on /health without the value.
+-spec admission() -> {ok, binary()} | {error, no_admission_token}.
+admission() -> admitting(token()).
+
+admitting(undefined) -> {error, no_admission_token};
+admitting(Token) -> {ok, Token}.
 
 %% @doc mcl_om_pubsub's options for one sealed publish under the group of
 %% `RealmName', through macula:publish/5.

@@ -1,5 +1,5 @@
 {application, guide_tender_lifecycle, [
-    {description, "CMD: the process, from the realm's tenders profile to each tender it pursues (tenderprofile-{digest} stream)"},
+    {description, "CMD: the process, from the realm's tenders profile to each tender it spots and pursues (tenderprofile-{digest} and tender-{digest} streams)"},
     {vsn, "0.1.1"},
     {registered, []},
     {applications, [
@@ -13,7 +13,10 @@
         %% The desks dispatch through evoq into mcl_tenders_store, which
         %% mcl_tenders opens before the service boots.
         evoq,
-        reckon_evoq
+        reckon_evoq,
+        %% The fact's process manager reads the realm's profile in process
+        %% (get_tender_profile:find/1), and the fact through tender_notice.
+        query_tenders
     ]},
     {env, []},
     {modules, []},

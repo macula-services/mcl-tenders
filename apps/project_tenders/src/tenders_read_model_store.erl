@@ -19,7 +19,9 @@
 %% initiated_at NULL, and the query side treats it as not there.
 %%
 %% ⚠ A WRITE CARRIES THE PROFILE, AND NO LOG MAY (T8). The write's arguments
-%% are the realm's CPV codes, countries, keywords, exclusions and description.
+%% are the realm's CPV codes, countries, keywords, exclusions and description,
+%% or a spotted tender and the keywords it hit, which draw the profile's
+%% outline (A2).
 %% So three things keep them out of every report:
 %%
 %%   - a raise while serving a request is answered, not exited on: the exit
@@ -62,7 +64,46 @@ schema() ->
 -spec migrations() -> [{pos_integer(), [string()]}].
 migrations() ->
     [{1, ["ALTER TABLE tender_profiles ADD COLUMN archived_at INTEGER",
-          "ALTER TABLE tender_profiles ADD COLUMN archived_by TEXT NOT NULL DEFAULT ''"]}].
+          "ALTER TABLE tender_profiles ADD COLUMN archived_by TEXT NOT NULL DEFAULT ''"]},
+     %% The morning list (#4).
+     {2, [%% One row per spotted tender. The correctable columns (deadline_at to
+         %% description_lang) hold the newest correction's value where it gave
+         %% one, the spotted notice's otherwise. `titles' is a JSON object,
+         %% language to title; the code lists are newline-separated. `status' is
+         %% tender_state's bit flags, OR-ed in by each projection. A row an event
+         %% other than tender_spotted_v1 created first has spotted_at NULL, and
+         %% the query side treats it as not there.
+         "CREATE TABLE IF NOT EXISTS tenders ("
+         " realm              TEXT NOT NULL,"
+         " tender_id          TEXT NOT NULL,"
+         " status             INTEGER NOT NULL DEFAULT 0,"
+         " publication_number TEXT NOT NULL DEFAULT '',"
+         " procedure_id       TEXT NOT NULL DEFAULT '',"
+         " notice_type        TEXT NOT NULL DEFAULT '',"
+         " buyer_name         TEXT NOT NULL DEFAULT '',"
+         " buyer_country      TEXT NOT NULL DEFAULT '',"
+         " cpv_codes          TEXT NOT NULL DEFAULT '',"
+         " deadline_at        INTEGER NOT NULL DEFAULT 0,"
+         " estimated_value    TEXT NOT NULL DEFAULT '',"
+         " currency           TEXT NOT NULL DEFAULT '',"
+         " titles             TEXT NOT NULL DEFAULT '{}',"
+         " description        TEXT NOT NULL DEFAULT '',"
+         " description_lang   TEXT NOT NULL DEFAULT '',"
+         " published_at       INTEGER NOT NULL DEFAULT 0,"
+         " matched_cpv_codes  TEXT NOT NULL DEFAULT '',"
+         " matched_keywords   TEXT NOT NULL DEFAULT '',"
+         " fit_rank           INTEGER NOT NULL DEFAULT 0,"
+         " spotted_at         INTEGER,"
+         " corrected_by       TEXT NOT NULL DEFAULT '',"
+         " amended_at         INTEGER NOT NULL DEFAULT 0,"
+         " amended_version    INTEGER NOT NULL DEFAULT -1,"
+         " award_publication_number TEXT NOT NULL DEFAULT '',"
+         " award_published_at INTEGER NOT NULL DEFAULT 0,"
+         " dismissed_by       TEXT NOT NULL DEFAULT '',"
+         " dismissed_at       INTEGER NOT NULL DEFAULT 0,"
+         " PRIMARY KEY (realm, tender_id))",
+         "CREATE INDEX IF NOT EXISTS tenders_by_morning"
+         " ON tenders (realm, published_at DESC, fit_rank DESC)"]}].
 
 -spec start_link(string()) -> {ok, pid()} | {error, term()}.
 start_link(SqlitePath) ->

@@ -7,8 +7,30 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-Refs macula-services/mcl-tenders#11.
+Refs macula-services/mcl-tenders#4 and #11.
 
+- **The morning list** (#4, first step). Each reported contract notice or
+  prior information notice that fits the realm's profile gets a dossier
+  (`tender_aggregate`, `spot_tender`); corrections (`amend_tender`) and the
+  award (`note_tender_award`) fold into it, and the bid team dismisses a tender
+  with `dismiss_tender`, which records the caller. The fit is keywords only for
+  now: country, CPV hierarchy, exclusions, keywords; similarity to the
+  profile's description comes later. Every notice is read again on arrival and
+  trusts none of the fact's text. New sealed procedures for the tenders role:
+  `get_tenders_page` (best first) and `get_tender_by_id`. At most
+  `MCL_TENDERS_DAILY_CAP` (500) tenders are spotted a day, and only a stored
+  spot takes a place, so a re-reported notice never eats the cap; `/health` info shows
+  `intake`, `sensor` and `quiet`. The process manager is subscribed to the
+  sensor's sealed fact through mcl_om 1.7.0's group admission, from the
+  realm's `mcl-tenders` org only, once the tenders group is set up.
+- **"Any tenders today?" in one read.** `get_tenders_page` also answers
+  `text`: the page as lines a person reads (title, buyer, country, deadline,
+  TED notice id), for an agent to answer with as it stands. The README walks
+  a realm from nothing to that answer, step by step, with
+  `scripts/mint-tenders-group-ucan.sh` (on the realm box) piped into
+  `scripts/set-tenders-group-env.sh` (on the node's box), so the group grant
+  is never shown and never enters git.
+- mcl_om `~> 1.7`.
 - **The realm can archive its profile** (`archive_tender_profile`, a sealed
   procedure for the tenders role, like the other two). The realm stops looking
   for public tenders: `get_tender_profile` answers `archived`, the sensor idles

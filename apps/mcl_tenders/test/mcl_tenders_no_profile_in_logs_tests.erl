@@ -12,7 +12,11 @@
 %%%   - the profile read in process and through the responder;
 %%%   - a description while the read-model store is stuck, so evoq's projection
 %%%     fails and retries until the store answers again;
-%%%   - a write that makes esqlite raise, carrying a canary.
+%%%   - a write that makes esqlite raise, carrying a canary;
+%%%   - a notice that fits and one that does not, a correction, an award, a
+%%%     tender dismissed, a spot the store refuses and a spot past the day's
+%%%     cap, each carrying canaries in its codes-free text: which notices fit
+%%%     draws the profile's outline (A2).
 %%%
 %%% Then format_status/1 of both stores, on a status shaped as a crash with a
 %%% canary in the request and in the stack.
@@ -25,7 +29,8 @@
 -define(MEMBER, <<16#a1:256>>).
 %% ASCII, so a match in any rendering of a binary or a string is a match.
 -define(CANARIES, [<<"zqcpvkw0rd">>, <<"zqexcl0sion">>, <<"zqdescr1ption">>, <<"zqrefus3d">>,
-                   <<"zqstuck">>, <<"zqraised">>]).
+                   <<"zqstuck">>, <<"zqraised">>, <<"zqn0tice">>, <<"zqbuy3r">>, <<"zqt1tle">>,
+                   <<"zqm1ss">>]).
 
 no_profile_in_logs_test_() ->
     {setup, fun start/0, fun stop/1,
@@ -68,6 +73,7 @@ every_profile_path_logged() ->
         mcl_tenders_pipeline:call(<<"get_tender_profile">>, #{}, ?MEMBER),
     a_stuck_store_is_retried_without_a_canary_in_the_log(Realm),
     a_raise_in_the_store_is_answered_without_its_arguments(),
+    every_dossier_path(Realm),
     Logged = drained([]),
     ?assertNotEqual([], Logged),
     ?assertEqual([], [{C, E} || E <- Logged, C <- ?CANARIES, carries(E, C)]).
@@ -88,6 +94,43 @@ a_raise_in_the_store_is_answered_without_its_arguments() ->
     ?assertMatch({error, {sqlite_raised, _, _}}, Reply),
     ?assertNot(carries(Reply, <<"zqraised">>)),
     ?assert(is_process_alive(whereis(tenders_read_model_store))).
+
+every_dossier_path(Realm) ->
+    {_, #{}} = describe(#{cpv_codes => [{text, <<"72000000">>}], countries => [{text, <<"NLD">>}],
+                          keywords => [{text, <<"zqcpvkw0rd">>}]}),
+    mcl_tenders_pipeline:eventually(fun() -> keywords(get_tender_profile:find(Realm)) end,
+                                    [<<"zqcpvkw0rd">>]),
+    Fact = fun(Overrides) ->
+                   tender_notice_fixture:fact(
+                     maps:merge(#{procedure_id => <<"canary-1">>, buyer_name => <<"zqbuy3r">>,
+                                  titles => #{<<"eng">> => <<"zqt1tle">>},
+                                  description => <<"zqn0tice zqcpvkw0rd">>}, Overrides))
+           end,
+    {spot_tender, ok} = mcl_tenders_pipeline:reported(Fact(#{})),
+    {skipped, {no_fit, keyword}} =
+        mcl_tenders_pipeline:reported(Fact(#{procedure_id => <<"canary-2">>,
+                                             description => <<"zqm1ss zqn0tice">>})),
+    {amend_tender, ok} = mcl_tenders_pipeline:reported(Fact(#{notice_type => <<"correction">>,
+                                                              publication_number => <<"750001-2026">>})),
+    {note_tender_award, ok} = mcl_tenders_pipeline:reported(Fact(#{notice_type => <<"award">>,
+                                                                   publication_number => <<"760001-2026">>})),
+    {_, #{}} = mcl_tenders_pipeline:call(<<"dismiss_tender">>, #{tender_id => {text, <<"canary-1">>}},
+                                         ?MEMBER),
+    mcl_tenders_pipeline:eventually(
+      fun() -> maps:get(dismissed_by, element(2, get_tender_by_id:find(Realm, <<"canary-1">>))) end,
+      binary:encode_hex(?MEMBER, lowercase)),
+    Live = #{realm => fun mcl_om:realm/0, profile => fun get_tender_profile:find/1,
+             noted => fun() -> ok end, spotted => fun() -> ok end},
+    {spot_tender, {error, store_error}} =
+        on_tender_notice_reported_v1_maybe_spot_tender:handled(
+          Fact(#{procedure_id => <<"canary-3">>}),
+          Live#{admit => fun() -> ok end,
+                dispatch => fun(_, Cmd) -> {error, {store_error, spot_tender_v1:to_map(Cmd)}} end}),
+    {skipped, capped} =
+        on_tender_notice_reported_v1_maybe_spot_tender:handled(
+          Fact(#{procedure_id => <<"canary-4">>}),
+          Live#{admit => fun() -> capped end, dispatch => fun(_, _) -> error(dispatched) end}),
+    ok.
 
 format_status_keeps_no_argument_test_() ->
     Status = #{state => kept, log => [{in, {exec, "SQL", [<<"zqfmt">>]}}],
