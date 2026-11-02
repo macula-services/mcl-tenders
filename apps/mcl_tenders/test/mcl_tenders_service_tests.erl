@@ -108,6 +108,33 @@ info_says_whether_the_group_is_set_up_test() ->
                                 {"MCL_TENDERS_GROUP_UCAN", "a-token"}],
                                fun() -> maps:get(sealing, ?SERVICE:info()) end)).
 
+%% The morning list's process manager listens to the sensor's sealed fact,
+%% from the realm's mcl-tenders org only, admitted by the group's token -- and
+%% only once the group is set up: before, nothing is declared, so a setup
+%% state never holds /health degraded. mcl_om's own check accepts it, and the
+%% declaration names the admission, never a token.
+subscribes_the_process_manager_once_the_group_is_set_up_test() ->
+    ?assertEqual([], without_org_key(fun ?SERVICE:subscriptions/0)),
+    Old = application:get_env(sense_tender_notices, realm_name),
+    ok = application:set_env(sense_tender_notices, realm_name, <<"io.example">>),
+    try
+        Subs = with_env([{"MCL_GROUP_ORG_KEY_ID", lists:duplicate(64, $a)},
+                         {"MCL_TENDERS_GROUP_UCAN", "canary-token-ab12"}],
+                        fun ?SERVICE:subscriptions/0),
+        ?assertMatch([#{topic := <<"io.example/mcl-tenders/tenders/", _/binary>>,
+                        module := on_tender_notice_reported_v1_maybe_spot_tender,
+                        sources := {org, <<"mcl-tenders">>},
+                        group := <<"io.example/mcl-tenders/tenders">>,
+                        admission := {tender_notices_group, admission, []}}], Subs),
+        ?assertEqual(ok, mcl_om_pubsub_subscriptions:validate(Subs)),
+        ?assertEqual(nomatch, binary:match(term_to_binary(Subs), <<"canary-token-ab12">>))
+    after
+        restore_app_env(Old)
+    end.
+
+restore_app_env(undefined) -> application:unset_env(sense_tender_notices, realm_name);
+restore_app_env({ok, V}) -> application:set_env(sense_tender_notices, realm_name, V).
+
 without_org_key(Fun) ->
     with_env([{"MCL_GROUP_ORG_KEY_ID", ""}, {"MCL_TENDERS_GROUP_UCAN", ""}], Fun).
 

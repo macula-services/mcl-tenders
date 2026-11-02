@@ -19,8 +19,17 @@ Refs macula-services/mcl-tenders#4 and #11.
   trusts none of the fact's text. New sealed procedures for the tenders role:
   `get_tenders_page` (best first) and `get_tender_by_id`. At most
   `MCL_TENDERS_DAILY_CAP` (500) tenders are spotted a day; `/health` info shows
-  `intake`, `sensor` and `quiet`. The process manager is not yet subscribed to
-  the sensor's facts: that waits for mcl_om 1.7.0 (macula-services/mcl-om#48).
+  `intake`, `sensor` and `quiet`. The process manager is subscribed to the
+  sensor's sealed fact through mcl_om 1.7.0's group admission, from the
+  realm's `mcl-tenders` org only, once the tenders group is set up.
+- **"Any tenders today?" in one read.** `get_tenders_page` also answers
+  `text`: the page as lines a person reads (title, buyer, country, deadline,
+  TED notice id), for an agent to answer with as it stands. The README walks
+  a realm from nothing to that answer, step by step, with
+  `scripts/mint-tenders-group-ucan.sh` (on the realm box) piped into
+  `scripts/set-tenders-group-env.sh` (on the node's box), so the group grant
+  is never shown and never enters git.
+- mcl_om `~> 1.7`.
 - **The realm can archive its profile** (`archive_tender_profile`, a sealed
   procedure for the tenders role, like the other two). The realm stops looking
   for public tenders: `get_tender_profile` answers `archived`, the sensor idles

@@ -32,7 +32,7 @@ replies() ->
     [{<<"describe_tender_profile">>, {[], []}},
      {<<"get_tender_profile">>,      {?PROFILE, []}},
      {<<"archive_tender_profile">>,  {[], []}},
-     {<<"get_tenders_page">>,        {[<<"tenders">>], []}},
+     {<<"get_tenders_page">>,        {[<<"tenders">>, <<"text">>], []}},
      {<<"get_tender_by_id">>,        {?DOSSIER, []}},
      {<<"dismiss_tender">>,          {[], []}}].
 

@@ -55,11 +55,13 @@ nothing more is recorded on it.
 | `query_tenders` (QRY) | `get_tender_profile`, `get_tenders_page`, `get_tender_by_id` | reads `tenders.sqlite3` |
 | `sense_tender_notices` (sensor) | `sense_ted_notices` | none: it reports facts, sealed |
 
-**Not wired yet: the subscription.** The process manager that turns a reported
-notice into a dossier is built and tested, but the node does not subscribe it
-to the sensor's facts until mcl_om lets a declared subscription carry the
-tenders group and its admission (mcl_om 1.7.0, macula-services/mcl-om#48). Until
-then the morning list on a live node stays empty.
+**The morning list fills once the tenders group is set up.** The node subscribes
+the process manager that turns a reported notice into a dossier to the sensor's
+own sealed fact (mcl_om 1.7.0), from the realm's `mcl-tenders` org only. It
+declares that subscription, and the sensor sweeps, only while both group
+variables are set (see Configuration); before, both wait and `/health` stays
+green. "Asking for today's tenders" below walks a realm from nothing to an
+agent reading the list.
 
 Not built yet: the pursuit of a tender, from "we bid" to won or lost (#4), the
 fit by similarity to the profile's description (#4), and the admin UI on the
@@ -81,7 +83,7 @@ the wire contract.
 | `mcl-tenders/describe_tender_profile` | `{"cpv_codes"?: [...], "countries"?: [...], "keywords"?: [...], "exclusions"?: [...], "description"?}` | `{}`: replaces the whole profile; a field left out is empty |
 | `mcl-tenders/get_tender_profile` | `{}` | `{cpv_codes, countries, keywords, exclusions, description, described_by, described_at}` |
 | `mcl-tenders/archive_tender_profile` | `{}` | `{}`: the realm stops looking for tenders; final, the caller recorded as who archived it |
-| `mcl-tenders/get_tenders_page` | `{"since"?, "limit"?, "include_dismissed"?}` | `{tenders: [...]}`: the morning list, best first |
+| `mcl-tenders/get_tenders_page` | `{"since"?, "limit"?, "include_dismissed"?}` | `{tenders: [...], text}`: the morning list, best first, and `text`, the same list as lines to read (title, buyer, country, deadline, notice id) |
 | `mcl-tenders/get_tender_by_id` | `{"tender_id"}` | `{tender_id, publication_number, procedure_id, notice_type, buyer_name, buyer_country, cpv_codes, titles, description, description_lang, deadline_at, estimated_value, currency, published_at, status, matched_cpv_codes, matched_keywords, spotted_at, corrected_by, amended_at, award_publication_number, award_published_at, dismissed_by, dismissed_at, ted_url}` |
 | `mcl-tenders/dismiss_tender` | `{"tender_id"}` | `{}`: the tender leaves the morning list; the caller is recorded |
 
@@ -182,6 +184,73 @@ outline, so the dossier keeps no notice text in the aggregate's state and no
 log line names a notice, a code or a term; `mcl_tenders_no_profile_in_logs_tests`
 also runs a fitting notice, a correction, an award and a dismissal with canary
 terms.
+
+## Asking for today's tenders
+
+*This exists so an agent the realm trusts can ask "any tenders today?" over
+the mesh and read the answer.*
+
+The answer is `get_tenders_page`'s `text`: one line per tender, best first,
+with its title, buyer, country, deadline and TED notice id. Getting there
+takes three parties, each doing what only it can do. Every step says what
+success looks like; stop at the first that does not show it.
+
+**On the realm, by a realm admin (once).**
+
+1. **The `mcl-tenders` org key.** The realm mints it when it issues
+   mcl-tenders' provider grant, so a realm where an mcl-tenders node already
+   answers `/health` with its grants granted has it. Step 5 prints its id.
+2. **The tenders role.** On the admin Roles page (`/admin/roles`), add a role
+   named `tenders`, organisation `mcl-tenders`, that may **call**
+   `get_tenders_page`, `get_tender_by_id`, `dismiss_tender`,
+   `get_tender_profile` and `describe_tender_profile`. Leave
+   `archive_tender_profile` out: it ends the realm's search for good.
+   *Success:* the form's preview lists the five as
+   `mcl-tenders/<name>` under "call", and the saved role shows on the page.
+
+**For the agent.**
+
+3. **A member of its own.** The agent's macula-mcp joins the realm by itself
+   (`MACULA_MCP_AUTOJOIN_REALM` set to the realm's name). *Success:* the admin
+   Members page (`/admin/members`) lists its node id with a **Roles…** button.
+   A node a person bound is that person's client and holds no roles: it has
+   no Roles… button, and this path does not work for it.
+4. **The role.** Members page, the agent's row, Roles…, grant `tenders`.
+   *Success:* the row lists `tenders`. Reconnect the agent's macula-mcp so it
+   fetches a membership token that carries the role.
+
+**On the node's box, by its operator.**
+
+5. **The group grant**, until macula-services/mcl-om#48 makes it go away. The
+   node id is on the Members page, the `mcl-tenders` row. From a checkout of
+   this repository, copy the writer to the node's box once, then mint the
+   grant on the realm box (in its macula-realm checkout, where the org keys
+   live) and pipe it straight into the node box's secret env file, so the
+   token is never shown and never lands anywhere else:
+
+       scp scripts/set-tenders-group-env.sh <node box>:
+       ssh <realm box> 'cd <macula-realm checkout> && bash -s -- <node id>' < scripts/mint-tenders-group-ucan.sh \
+         | ssh <node box> './set-tenders-group-env.sh'
+
+   *Success:* the last line reads `wrote ~/.macula/secrets/mcl-tenders.env
+   (0600): MCL_GROUP_ORG_KEY_ID=<hex>, MCL_TENDERS_GROUP_UCAN (<n> characters)`.
+   The grant is valid 30 days; mint again before then. An expired grant idles
+   the sensor, it never stops the service.
+6. **The node picks it up.** The deployment passes that file to the container
+   by name only (its values never enter git); the next deploy recreates the
+   container with them. *Success:* `scripts/health.sh` shows
+   `sealing: set` and `sensor.state: sweeping`.
+
+**From the agent.**
+
+7. **The profile**, once: `mesh_call` `mcl-tenders/describe_tender_profile`
+   with at least one CPV code and one country, `confidential: "required"`,
+   `ucan: 1`. *Success:* `{}`, and `get_tender_profile` reads it back.
+8. **The ask.** After the next sweep (every fifteen minutes; TED publishes on
+   working days), `mesh_call` `mcl-tenders/get_tenders_page` with
+   `{"since": <today 00:00 UTC, unix ms>}`, `confidential: "required"`,
+   `ucan: 1`. *Success:* `text` starts `N tenders (best first):`, or reads
+   `No tenders on the list.` when nothing that fits came out today.
 
 ## The sensor
 

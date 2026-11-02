@@ -193,8 +193,8 @@
 <text class="t-rel" x="558" y="610">writes</text>
 <path class="edge" d="M900 580V705H700" marker-end="url(#a)"/>
 <text class="t-rel" x="908" y="650">reads</text>
-<path class="edge-later" d="M1400 505H1440V905H1400" marker-end="url(#a)"/>
-<text class="t-rel" x="1448" y="705" text-anchor="middle" transform="rotate(90 1448 705)">the sealed fact: subscribed with mcl_om 1.7.0</text>
+<path class="edge" d="M1400 505H1440V905H1400" marker-end="url(#a)"/>
+<text class="t-rel" x="1448" y="705" text-anchor="middle" transform="rotate(90 1448 705)">the sealed fact, from the mcl-tenders org</text>
 <path class="edge" d="M1150 830V805H1000V580" marker-end="url(#a)"/>
 <text class="t-rel" x="1008" y="800">profile</text>
 <path class="edge" d="M1250 980V1015H200V980" marker-end="url(#a)"/>
@@ -211,8 +211,8 @@
 <text class="t-desc" x="50" y="1108">nowhere else: not in a log, not in a crash report, not in an aggregate's state. Which notices fit draws the profile's</text>
 <text class="t-desc" x="50" y="1126">outline, so the dossiers keep the same rule. Every procedure is sealed and admits only identities the realm granted the</text>
 <text class="t-desc" x="50" y="1144">tenders role. The sensor asks TED for the profile's codes and countries only, and its facts travel sealed under the</text>
-<text class="t-desc" x="50" y="1162">realm's tenders group. The dashed edge is not wired yet: the node subscribes the process manager once mcl_om 1.7.0 lets a</text>
-<text class="t-desc" x="50" y="1180">declared subscription carry the group and its admission (macula-services/mcl-om#48).</text>
+<text class="t-desc" x="50" y="1162">realm's tenders group, to the process manager the node subscribes once the group is set up. The morning list also</text>
+<text class="t-desc" x="50" y="1180">answers as text, one line per tender, for an agent to read out.</text>
 <rect class="b-sys" x="24" y="1220" width="22" height="14" rx="3"/>
 <text class="t-leg" x="54" y="1232">In scope</text>
 <rect class="b-per" x="110.8" y="1220" width="22" height="14" rx="3"/>

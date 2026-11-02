@@ -15,7 +15,8 @@
 
 -behaviour(mcl_om_service).
 
--export([info/0, start/1, stop/1, health/0, capabilities/0, identity_spec/0]).
+-export([info/0, start/1, stop/1, health/0, capabilities/0, identity_spec/0,
+         subscriptions/0]).
 %% ==========================================================================
 %% AND THE STORE THIS SERVICE OWNS
 %% ==========================================================================
@@ -103,6 +104,31 @@ naming_the_wait(Missing) ->
                   [lists:join(", ", Missing)]).
 
 stop(_State) -> ok.
+
+%% WHAT THIS SERVICE LISTENS TO: the sensor's fact, so each reported notice
+%% reaches the process manager that may spot a tender (the morning list).
+%% Sealed under the realm's tenders group: mcl_om calls the admission once per
+%% subscribe attempt and hands the token straight to macula, so it sits in no
+%% child spec, state or log (mcl_om 1.7.0, mcl-om#49). Its sources are the
+%% realm's `mcl-tenders' org (T4): the realm's own sensors, whatever their node
+%% ids, and nobody else.
+%%
+%% Declared only once the group is set up, the way the sensor idles until
+%% then: a subscription declared without its admission would hold /health
+%% degraded for what is a setup state, not a fault (info's `sealing'). Pure:
+%% read from the environment and app env, as mcl_om requires.
+subscriptions() ->
+    subscribed(tender_notices_group:missing()).
+
+subscribed([]) ->
+    RealmName = mcl_tenders_facts:realm_name(),
+    [#{topic => mcl_tenders_facts:topic(RealmName),
+       module => on_tender_notice_reported_v1_maybe_spot_tender,
+       sources => {org, tender_notices_group:org()},
+       group => tender_notices_group:prefix(RealmName),
+       admission => {tender_notices_group, admission, []}}];
+subscribed(_Missing) ->
+    [].
 
 %% Green once the supervision tree is up. A dark mesh is not a health failure:
 %% the profile stays readable in process, and a restart would not light it.

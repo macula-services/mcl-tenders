@@ -69,6 +69,14 @@ jobs:
         env:
           REGISTRY: localhost:5000
 
+  # scripts/set-tenders-group-env.sh writes the group grant on the node's box
+  # and must never print it (README, "Asking for today's tenders").
+  group-grant-writer-never-prints-the-token:
+    runs-on: ["ubuntu-latest"]
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/set-tenders-group-env_test.sh
+
   # A dependency the release ships with a published advisory fails this, and so
   # the image: build-push.yml's build waits on this workflow (macula-services/mcl-jobs#6,
   # macula-codebase-checks#11). Erlang reads the resolved rebar.lock as an

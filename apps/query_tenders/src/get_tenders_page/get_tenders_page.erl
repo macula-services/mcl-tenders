@@ -3,7 +3,8 @@
 %%
 %% Best first is the tenders that hit the most keywords, then the newest. A
 %% dismissed tender is left out unless asked for. Each entry is a summary;
-%% get_tender_by_id has the whole dossier.
+%% get_tender_by_id has the whole dossier. `text' is the same page as a person
+%% reads it (get_tenders_page_text), for an agent to answer with as it stands.
 -module(get_tenders_page).
 
 -export([find/2, columns/0]).
@@ -26,7 +27,7 @@ columns() ->
 
 %% @doc One page of Realm's spotted tenders, a 32-byte realm id.
 -spec find(term(), map()) ->
-          {ok, #{tenders := [map()]}} | {error, invalid_realm | invalid_page | store_unavailable}.
+          {ok, #{tenders := [map()], text := binary()}} | {error, invalid_realm | invalid_page | store_unavailable}.
 find(<<_:256>> = Realm, Opts) when is_map(Opts) ->
     paged(checked(Opts), Realm);
 find(_Realm, _Opts) ->
@@ -54,7 +55,9 @@ paged({ok, Since, Limit, Hidden}, Realm) ->
             [binary:encode_hex(Realm, lowercase), Since, Hidden, Limit])).
 
 found({error, _}) -> {error, store_unavailable};
-found(Rows) -> {ok, #{tenders => [summary(Row) || Row <- Rows]}}.
+found(Rows) ->
+    Summaries = [summary(Row) || Row <- Rows],
+    {ok, #{tenders => Summaries, text => get_tenders_page_text:rendered(Summaries)}}.
 
 summary([Id, Number, Type, Buyer, Country, Titles, Deadline, Value, Currency, Published, Status,
          Cpv, Keywords]) ->

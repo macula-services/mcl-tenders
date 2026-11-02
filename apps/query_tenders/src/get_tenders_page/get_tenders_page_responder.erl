@@ -6,7 +6,7 @@
 %%% the handler runs.
 %%%
 %%% Payload: `since' (unix ms, optional), `limit' (1..100, optional) and
-%%% `include_dismissed' (0 or 1, optional). Replies `#{tenders => [...]}', or
+%%% `include_dismissed' (0 or 1, optional). Replies `#{tenders => [...], text => Text}', or
 %%% `#{reason => Why}' (README, "Procedures").
 %%% @end
 -module(get_tenders_page_responder).
