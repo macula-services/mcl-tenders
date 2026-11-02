@@ -26,6 +26,7 @@ dossier_test_() ->
       {timeout, 60, fun a_dismissal_hides_the_tender_and_names_the_caller/0},
       {timeout, 60, fun a_pursuit_runs_from_bid_to_outcome_and_names_each_caller/0},
       {timeout, 60, fun a_declined_pursuit_reads_declined/0},
+      {timeout, 60, fun a_lost_pursuit_reads_lost/0},
       {timeout, 60, fun the_list_is_best_first_and_bounded/0},
       {timeout, 60, fun a_correction_projected_before_its_spot_is_kept/0},
       {timeout, 60, fun a_correction_of_a_tender_never_spotted_is_not_listed/0},
@@ -207,15 +208,29 @@ a_declined_pursuit_reads_declined() ->
     ?assertEqual({<<"pursue_tender">>, #{}}, pursuit_call(<<"pursue_tender">>, Id, #{}, ?MEMBER)),
     ?assertEqual({<<"pursue_tender">>, #{<<"reason">> => {text, <<"already_pursued">>}}},
                  pursuit_call(<<"pursue_tender">>, Id, #{}, ?MEMBER)),
-    ?assertEqual({<<"decline_tender">>, #{}}, pursuit_call(<<"decline_tender">>, Id, #{}, ?MEMBER)),
+    ?assertEqual({<<"decline_tender">>, #{}},
+                 pursuit_call(<<"decline_tender">>, Id, #{declined_by => {text, <<"someone-else">>}},
+                              ?MEMBER)),
     ?assertEqual({<<"submit_tender_bid">>, #{<<"reason">> => {text, <<"declined">>}}},
                  pursuit_call(<<"submit_tender_bid">>, Id, #{}, ?MEMBER)),
     mcl_tenders_pipeline:eventually(field(Id, status),
                                     ?TENDER_SPOTTED bor ?TENDER_PURSUED bor ?TENDER_DECLINED),
-    ?assertMatch({ok, #{declined_by := _, submitted_by := <<>>, outcome := <<>>}}, by_id(Id)),
+    Me = binary:encode_hex(?MEMBER, lowercase),
+    ?assertMatch({ok, #{declined_by := Me, submitted_by := <<>>, outcome := <<>>}}, by_id(Id)),
     %% The dismissed tender of the test before is not pursued.
     ?assertEqual({<<"pursue_tender">>, #{<<"reason">> => {text, <<"dismissed">>}}},
                  pursuit_call(<<"pursue_tender">>, ?TENDER, #{}, ?MEMBER)).
+
+%% The projection's LOST flag, read back against tender_status.hrl.
+a_lost_pursuit_reads_lost() ->
+    Id = <<"pursuit-lost-1">>,
+    spotted_early(Id),
+    [?assertEqual({Name, #{}}, pursuit_call(Name, Id, Extra, ?MEMBER))
+     || {Name, Extra} <- [{<<"pursue_tender">>, #{}}, {<<"submit_tender_bid">>, #{}},
+                          {<<"record_tender_outcome">>, #{outcome => {text, <<"lost">>}}}]],
+    mcl_tenders_pipeline:eventually(
+      field(Id, status), ?TENDER_SPOTTED bor ?TENDER_PURSUED bor ?TENDER_BID_SUBMITTED bor ?TENDER_LOST),
+    ?assertMatch({ok, #{outcome := <<"lost">>}}, by_id(Id)).
 
 %% Most keywords hit first, then the newest; `since' and `limit' bound it.
 the_list_is_best_first_and_bounded() ->
