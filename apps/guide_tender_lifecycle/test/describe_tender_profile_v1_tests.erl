@@ -119,3 +119,21 @@ the_command_and_event_survive_their_maps_test() ->
                                            exclusions => [], description => <<>>,
                                            described_at => 3}),
     ?assertEqual({ok, Ev}, tender_profile_described_v1:from_map(tender_profile_described_v1:to_map(Ev))).
+
+%% `unless_described' is 0 or 1, 0 when absent, and travels in the command's
+%% map so the aggregate reads it; a command rebuilt from an older map is 0.
+unless_described_is_zero_or_one_test() ->
+    Base = #{realm => <<1:256>>, described_by => <<2:256>>,
+             cpv_codes => [<<"72000000">>], countries => [<<"BEL">>]},
+    {ok, Plain} = describe_tender_profile_v1:new(Base),
+    ?assertEqual(0, describe_tender_profile_v1:unless_described(Plain)),
+    {ok, Once} = describe_tender_profile_v1:new(Base#{unless_described => 1}),
+    ?assertMatch(#{unless_described := 1}, describe_tender_profile_v1:to_map(Once)),
+    {ok, Rebuilt} = describe_tender_profile_v1:from_map(describe_tender_profile_v1:to_map(Once)),
+    ?assertEqual(1, describe_tender_profile_v1:unless_described(Rebuilt)),
+    {ok, Old} = describe_tender_profile_v1:from_map(
+                  maps:remove(unless_described, describe_tender_profile_v1:to_map(Once))),
+    ?assertEqual(0, describe_tender_profile_v1:unless_described(Old)),
+    [?assertEqual({error, invalid_unless_described},
+                  describe_tender_profile_v1:new(Base#{unless_described => V}))
+     || V <- [2, true, <<"1">>]].

@@ -87,7 +87,9 @@ quiet({ok, #{state := sweeping, last_swept_at := At}}, Now) when Now - At < ?QUI
 quiet(_Status, _Now) -> 1.
 
 %% The realm's profile is born the first time mcl-tenders boots in the realm,
-%% and is already there on every boot after. The store is open (mcl_tenders_app)
+%% and is already there on every boot after. If the deployment names a
+%% profile (MCL_TENDERS_PROFILE_CPV, _COUNTRIES) and it was never described,
+%% the node describes it (describe_tender_profile_from_config). The store is open (mcl_tenders_app)
 %% and the projections listen (project_tenders) by the time this runs.
 %%
 %% The realm name the fact topic and the group carry is checked against the
@@ -97,6 +99,7 @@ start(_Opts) ->
     ok = mcl_tenders_facts:check_realm_name(),
     {ok, Realm} = mcl_om:realm(),
     ok = maybe_initiate_tender_profile:for_realm(Realm),
+    ok = describe_tender_profile_from_config:at_boot(Realm, fun os:getenv/1),
     ok = naming_the_wait(tender_notices_group:missing()),
     mcl_tenders_sup:start_link().
 

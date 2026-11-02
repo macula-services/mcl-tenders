@@ -212,9 +212,19 @@ with its title, buyer, country, deadline and TED notice id. Getting there
 takes three parties, each doing what only it can do. Every step says what
 success looks like; stop at the first that does not show it.
 
-With open reads on (see "Open reads"), the agent needs no role: skip steps 2
-and 4, keep step 3 (the agent is a member of its own), and step 7, which
-describes the profile, stays with the role. Steps 5, 6 and 8 are the same.
+**The short path: no role, no realm admin.** The node's deployment does what
+the role is for. Three lines in the node's environment (its config, not a
+secret):
+
+    MCL_TENDERS_OPEN_READS=1
+    MCL_TENDERS_PROFILE_CPV=72000000
+    MCL_TENDERS_PROFILE_COUNTRIES=BEL
+
+The first opens the two reads to every member of the realm ("Open reads").
+The other two describe the profile at boot (step 7, "from the node's
+config"), which needs nobody's role. Then steps 1, 3, 5, 6 and 8 are the whole
+path: steps 2 and 4 (the role) and step 7 over the mesh are for agents that
+manage the profile themselves.
 
 **On the realm, by a realm admin (once).**
 
@@ -275,9 +285,26 @@ describes the profile, stays with the role. Steps 5, 6 and 8 are the same.
 
 **From the agent.**
 
-7. **The profile**, once: `mesh_call` `mcl-tenders/describe_tender_profile`
-   with at least one CPV code and one country, `confidential: "required"`,
-   `ucan: 1`. *Success:* `{}`, and `get_tender_profile` reads it back.
+7. **The profile**, once, one of two ways.
+   - **From the node's config** (no role): `MCL_TENDERS_PROFILE_CPV` and
+     `MCL_TENDERS_PROFILE_COUNTRIES`, each comma-separated (CPV codes of eight
+     digits; ISO 3166-1 alpha-3 countries in capitals, `BEL`, never `BE`). At
+     boot the node describes the profile with them, through the same command
+     and rules as the CALL below, recorded as described by the node itself,
+     but **only if the profile was never described**: a profile described
+     over the mesh, or by an earlier boot, is kept, and changing the lines
+     later changes nothing. Both unset: nothing happens. A bad value never
+     stops the boot; the log names why (`invalid_cpv_codes`,
+     `invalid_countries`, `profile_cpv_unset`, `profile_countries_unset`),
+     and counts, never the codes.
+   - **Over the mesh** (the tenders role): `mesh_call`
+     `mcl-tenders/describe_tender_profile` with at least one CPV code and one
+     country, `confidential: "required"`, `ucan: 1`. This one replaces the
+     profile every time.
+   *Success:* `scripts/health.sh` shows `sensor.state: sweeping` (not
+   `idle_reason: no_profile`); the log reads `described the realm's profile
+   from config at boot: 1 CPV codes, 1 countries` for the first way, the CALL
+   answers `{}` for the second.
 8. **The ask.** After the next sweep (every fifteen minutes; TED publishes on
    working days), `mesh_call` `mcl-tenders/get_tenders_page` with
    `{"since": <today 00:00 UTC, unix ms>}`, `confidential: "required"`,

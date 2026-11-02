@@ -16,6 +16,16 @@ Refs macula-services/mcl-tenders#20.
   still refused. The profile, `dismiss_tender` and `archive_tender_profile`
   stay with the tenders role. `/health` info names it: `reads` is `role` or
   `members`.
+- **The node can describe the realm's profile from its config, at boot.**
+  `MCL_TENDERS_PROFILE_CPV` and `MCL_TENDERS_PROFILE_COUNTRIES`
+  (comma-separated; countries alpha-3) describe it through
+  `maybe_describe_tender_profile:dispatch`, the same command, rules and event
+  as the CALL, by the node's own id, and only when the profile was never
+  described: `describe_tender_profile_v1` gains `unless_described`, and the
+  aggregate refuses `already_described` on a described profile, so one the
+  realm described over the mesh is kept. A bad value is logged by its reason
+  and never stops the boot. With open reads, the demo path needs no role and
+  no realm admin.
 
 ## [0.3.0] - 2026-11-02
 
