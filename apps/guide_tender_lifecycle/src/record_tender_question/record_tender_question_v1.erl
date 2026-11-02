@@ -5,7 +5,8 @@
 %%% caller the realm granted the tenders role. The question is kept in NFC, up
 %%% to 4000 bytes, line breaks allowed and no other control or invisible format
 %%% character (tender_profile_text). Its `question_id' is the SHA-256 of that
-%%% text, so the same question recorded twice is one question. `recorded_by'
+%%% text, so the same question recorded twice is one question (the read model
+%%% keeps who recorded it first). `recorded_by'
 %%% is the node id macula verified for that call, never a field of the payload
 %%% (T13). Only on a pursued tender (tender_aggregate).
 %%% @end

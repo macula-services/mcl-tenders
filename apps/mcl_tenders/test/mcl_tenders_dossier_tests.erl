@@ -253,10 +253,10 @@ a_pursuit_keeps_its_documents_and_questions() ->
                  pursuit_call(<<"attach_tender_document">>, Id, Doc#{attached_by => Forged}, ?MEMBER)),
     ?assertEqual({<<"record_tender_question">>, #{}},
                  pursuit_call(<<"record_tender_question">>, Id, Ask#{recorded_by => Forged}, ?MEMBER)),
-    %% The same question again is the same question; the same digest again
-    %% moves the document.
+    %% The same question again, by another role holder, is the same question
+    %% and keeps who asked it first; the same digest again moves the document.
     ?assertEqual({<<"record_tender_question">>, #{}},
-                 pursuit_call(<<"record_tender_question">>, Id, Ask, ?MEMBER)),
+                 pursuit_call(<<"record_tender_question">>, Id, Ask, <<16#b2:256>>)),
     Moved = Doc#{location => {text, <<"bids/2026/final/offerte.pdf">>}},
     ?assertEqual({<<"attach_tender_document">>, #{}},
                  pursuit_call(<<"attach_tender_document">>, Id, Moved, ?MEMBER)),

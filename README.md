@@ -141,7 +141,8 @@ as a keyword, and `sha256`, the file's SHA-256 as 64 lowercase hex digits.
 The file itself never travels: only these three do, sealed. Attaching the
 same digest again renames or moves the document. A `question` is up to 4000
 bytes, line breaks allowed; its `question_id` is the SHA-256 of its text in
-lowercase hex, so the same question recorded twice is one question. Each
+lowercase hex, so the same question recorded twice is one question, kept with
+who recorded it first. Each
 document answers `{name, sha256, location, attached_by, attached_at}` and
 each question `{question_id, question, recorded_by, recorded_at}`, the
 caller a 64-hex node id as above. Neither changes a tender's `status`.
