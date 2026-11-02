@@ -18,7 +18,10 @@ file newer than it knows (`schema_newer_than_release`). To roll back, pin the
 0.3.1 digest and move `tenders.sqlite3` out of `MCL_DATA_DIR`: on boot the
 read model is rebuilt from the event store, which keeps every event. 0.3.1
 ignores the pursuit's events, so the pursuit, its documents and its questions
-stay in the store, unread, until the node rolls forward again.
+stay in the store, unread, until the node rolls forward again. While rolled
+back, 0.3.1 does not see that a tender is pursued, so it accepts
+`dismiss_tender` on one; after rolling forward, that dossier reads both
+pursued and dismissed.
 
 - **A pursuit's documents and questions.** Two sealed procedures for the
   tenders role on a pursued tender: `attach_tender_document` (name, SHA-256,

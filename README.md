@@ -504,7 +504,9 @@ forward: a release refuses a `tenders.sqlite3` newer than it knows
 0.3.x, for one) also moves `tenders.sqlite3` out of `MCL_DATA_DIR`. The next
 boot rebuilds the read model from the event store, which keeps every event;
 what the older release does not know stays in the store, unread, until the
-node rolls forward. CHANGELOG names each release that changes the schema.
+node rolls forward. Nor does the older release apply rules it does not know:
+0.3.x, which cannot see that a tender is pursued, accepts `dismiss_tender` on
+one, and after rolling forward that dossier reads both pursued and dismissed. CHANGELOG names each release that changes the schema.
 
 The service's org, the `<org>` its procedure names carry, is this repository's
 name, fixed in `config/sys.config.src`. The realm's grant names it; without an
