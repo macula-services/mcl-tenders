@@ -1,6 +1,7 @@
 %% @doc get_tender_by_id: one spotted tender's whole dossier, as the realm
 %% last saw it: the notice, why it fits, the correction and award noted on
-%% it, and who dismissed it and when.
+%% it, who dismissed it, and its pursuit: who pursued, declined or bid, and
+%% whether it was won or lost.
 -module(get_tender_by_id).
 
 -export([find/2, columns/0]).
@@ -16,7 +17,9 @@ columns() ->
      "buyer_country", "cpv_codes", "titles", "description", "description_lang",
      "deadline_at", "estimated_value", "currency", "published_at", "status",
      "matched_cpv_codes", "matched_keywords", "spotted_at", "corrected_by", "amended_at",
-     "award_publication_number", "award_published_at", "dismissed_by", "dismissed_at"].
+     "award_publication_number", "award_published_at", "dismissed_by", "dismissed_at",
+     "pursued_by", "pursued_at", "declined_by", "declined_at", "submitted_by", "submitted_at",
+     "outcome", "outcome_by", "outcome_at"].
 
 %% @doc The tender TenderId of Realm, a 32-byte realm id.
 -spec find(term(), term()) ->
@@ -38,7 +41,9 @@ found({error, _}) -> {error, store_unavailable}.
 
 dossier([Id, Number, Procedure, Type, Buyer, Country, Cpv, Titles, Description, Lang,
          Deadline, Value, Currency, Published, Status, MatchedCpv, MatchedKeywords, Spotted,
-         CorrectedBy, AmendedAt, AwardNumber, AwardAt, DismissedBy, DismissedAt]) ->
+         CorrectedBy, AmendedAt, AwardNumber, AwardAt, DismissedBy, DismissedAt,
+         PursuedBy, PursuedAt, DeclinedBy, DeclinedAt, SubmittedBy, SubmittedAt,
+         Outcome, OutcomeBy, OutcomeAt]) ->
     #{tender_id => Id, publication_number => Number, procedure_id => Procedure,
       notice_type => Type, buyer_name => Buyer, buyer_country => Country,
       cpv_codes => tenders_rows:listed(Cpv), titles => tenders_rows:titles(Titles),
@@ -49,4 +54,8 @@ dossier([Id, Number, Procedure, Type, Buyer, Country, Cpv, Titles, Description, 
       corrected_by => CorrectedBy, amended_at => AmendedAt,
       award_publication_number => AwardNumber, award_published_at => AwardAt,
       dismissed_by => DismissedBy, dismissed_at => DismissedAt,
+      pursued_by => PursuedBy, pursued_at => PursuedAt,
+      declined_by => DeclinedBy, declined_at => DeclinedAt,
+      submitted_by => SubmittedBy, submitted_at => SubmittedAt,
+      outcome => Outcome, outcome_by => OutcomeBy, outcome_at => OutcomeAt,
       ted_url => tenders_rows:ted_url(Number)}.

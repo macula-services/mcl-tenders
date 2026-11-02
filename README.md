@@ -50,7 +50,7 @@ nothing more is recorded on it.
 
 | Division | Desks | Dossier or read model |
 |----------|-------|-----------------------|
-| `guide_tender_lifecycle` (CMD) | `initiate_tender_profile` (at boot), `describe_tender_profile`, `archive_tender_profile`; `spot_tender`, `amend_tender`, `note_tender_award`, `dismiss_tender`; process manager `on_tender_notice_reported_v1_maybe_spot_tender` | the realm's profile, keyed by the realm; one dossier per tender |
+| `guide_tender_lifecycle` (CMD) | `initiate_tender_profile` (at boot), `describe_tender_profile`, `archive_tender_profile`; `spot_tender`, `amend_tender`, `note_tender_award`, `dismiss_tender`; `pursue_tender`, `decline_tender`, `submit_tender_bid`, `record_tender_outcome`; process manager `on_tender_notice_reported_v1_maybe_spot_tender` | the realm's profile, keyed by the realm; one dossier per tender |
 | `project_tenders` (PRJ) | one projection per event | `tenders.sqlite3`: the profile and the tenders |
 | `query_tenders` (QRY) | `get_tender_profile`, `get_tenders_page`, `get_tender_by_id` | reads `tenders.sqlite3` |
 | `sense_tender_notices` (sensor) | `sense_ted_notices` | none: it reports facts, sealed |
@@ -63,9 +63,9 @@ variables are set (see Configuration); before, both wait and `/health` stays
 green. "Asking for today's tenders" below walks a realm from nothing to an
 agent reading the list.
 
-Not built yet: the pursuit of a tender, from "we bid" to won or lost (#4), the
-fit by similarity to the profile's description (#4), and the admin UI on the
-LAN where the bid team sets the profile.
+Not built yet: the bid's documents and the buyer's questions on a pursuit
+(#4), the fit by similarity to the profile's description (#4), and the admin
+UI on the LAN where the bid team sets the profile.
 
 ## Procedures
 
@@ -85,8 +85,12 @@ the wire contract.
 | `mcl-tenders/get_tender_profile` | `{}` | `{cpv_codes, countries, keywords, exclusions, description, described_by, described_at}` |
 | `mcl-tenders/archive_tender_profile` | `{}` | `{}`: the realm stops looking for tenders; final, the caller recorded as who archived it |
 | `mcl-tenders/get_tenders_page` | `{"since"?, "limit"?, "include_dismissed"?}` | `{tenders: [...], text}`: the morning list, best first, and `text`, the same list as lines to read (title, buyer, country, deadline, notice id) |
-| `mcl-tenders/get_tender_by_id` | `{"tender_id"}` | `{tender_id, publication_number, procedure_id, notice_type, buyer_name, buyer_country, cpv_codes, titles, description, description_lang, deadline_at, estimated_value, currency, published_at, status, matched_cpv_codes, matched_keywords, spotted_at, corrected_by, amended_at, award_publication_number, award_published_at, dismissed_by, dismissed_at, ted_url}` |
+| `mcl-tenders/get_tender_by_id` | `{"tender_id"}` | `{tender_id, publication_number, procedure_id, notice_type, buyer_name, buyer_country, cpv_codes, titles, description, description_lang, deadline_at, estimated_value, currency, published_at, status, matched_cpv_codes, matched_keywords, spotted_at, corrected_by, amended_at, award_publication_number, award_published_at, dismissed_by, dismissed_at, pursued_by, pursued_at, declined_by, declined_at, submitted_by, submitted_at, outcome, outcome_by, outcome_at, ted_url}` |
 | `mcl-tenders/dismiss_tender` | `{"tender_id"}` | `{}`: the tender leaves the morning list; the caller is recorded |
+| `mcl-tenders/pursue_tender` | `{"tender_id"}` | `{}`: the bid team goes for it (bid, not no-bid); the caller is recorded |
+| `mcl-tenders/decline_tender` | `{"tender_id"}` | `{}`: a pursued tender gets no bid after all; the caller is recorded |
+| `mcl-tenders/submit_tender_bid` | `{"tender_id"}` | `{}`: the bid for a pursued tender went in; the caller is recorded |
+| `mcl-tenders/record_tender_outcome` | `{"tender_id", "outcome"}` | `{}`: `outcome` is `won` or `lost`, once the bid went in; the caller is recorded |
 
 ### Open reads
 
@@ -96,8 +100,8 @@ the wire contract.
 They show the realm's tenders, built from public TED notices, including who
 dismissed one. A node of another realm is still refused, and the calls must
 still be sealed. The profile (`describe_tender_profile`, `get_tender_profile`:
-what the realm looks for), `dismiss_tender` and `archive_tender_profile` stay
-with the tenders role whatever the switch says. Any other value, or none,
+what the realm looks for), `dismiss_tender`, the four pursuit procedures and
+`archive_tender_profile` stay with the tenders role whatever the switch says. Any other value, or none,
 keeps the reads with the role. `/health` info says which: `reads` is `role`
 or `members`. To close them again, remove the line and redeploy.
 
@@ -112,10 +116,16 @@ tender unless `include_dismissed` is 1. Each entry is a summary: `tender_id`,
 `deadline_at`, `estimated_value`, `currency`, `published_at`, `status`,
 `matched_cpv_codes`, `matched_keywords` and `ted_url`. `titles` is a list of
 `{lang, title}`. `status` is a bit flag set: 1 spotted, 2 corrected, 4 award
-published, 8 dismissed. `ted_url` is rebuilt from the publication number alone,
+published, 8 dismissed, 16 pursued, 32 declined, 64 bid submitted, 128 won,
+256 lost. `ted_url` is rebuilt from the publication number alone,
 never taken from a notice. `get_tender_by_id` answers the whole dossier;
 `corrected_by` is the publication number of the newest correction and
-`dismissed_by` the 64-hex node id of the caller that dismissed it.
+`dismissed_by` the 64-hex node id of the caller that dismissed it. The
+pursuit's `pursued_by`, `declined_by`, `submitted_by` and `outcome_by` are
+node ids the same way, each with its `_at` time (0 until then), and `outcome`
+is empty, `won` or `lost`. A line of `text` ends with where the pursuit stands
+(`| pursuit: pursuing`, `bid submitted`, `declined`, `won` or `lost`) once the
+tender is pursued.
 
 The Answer column is a contract a test holds to: `mcl_tenders_wire_replies_tests`
 calls each responder against a real store and read model, reads its reply
@@ -133,6 +143,15 @@ here change.
 | `invalid_page` | `since` is not a count, `limit` not 1 to 100, or `include_dismissed` not 0 or 1 |
 | `invalid_tender_id` | a tender id is 1 to 64 letters, digits and hyphens |
 | `already_dismissed` | the tender was dismissed before |
+| `pursued` | the tender is pursued, so it is not dismissed: decline it instead |
+| `dismissed` | the tender was dismissed, so it is not pursued |
+| `already_pursued` | the tender is pursued already |
+| `not_pursued` | decline or submit a bid only on a pursued tender |
+| `declined`, `already_declined` | the pursuit was declined: no bid goes in, and it is not declined twice |
+| `already_submitted` | the bid went in: it is not submitted again, and no longer declined |
+| `not_submitted` | an outcome is recorded only once the bid went in |
+| `invalid_outcome` | `outcome` is `won` or `lost` |
+| `already_recorded` | the outcome was recorded before |
 | `archived` | the profile is archived: it is not read, and not described again |
 | `already_archived` | the profile was archived before |
 | `no_caller` | the CALL carried no 32-byte node id |
@@ -187,6 +206,15 @@ correction or award of a tender the realm never spotted leaves nothing.
 The list ranks the tenders that hit the most keywords first, then the newest.
 A tender the bid team dismisses leaves the list and stays readable by id.
 
+**The pursuit.** A spotted tender the bid team goes for is pursued; from there
+it is either declined (no bid after all) or its bid is submitted, and a
+submitted bid is recorded as won or lost. Each step is once, in that order,
+and records the node that signed the call, never a name from the payload
+(T13). Dismissing is for before a pursuit; a pursued tender is declined
+instead. A correction or an award of a pursued tender still folds into its
+dossier, so the pursuit sees the new deadline and the published award without
+anyone retyping them.
+
 At most `MCL_TENDERS_DAILY_CAP` tenders (500 by default) are spotted a UTC day,
 so a flood of facts cannot flood the dossiers; the rest of the day's are
 dropped and counted. Only a stored spot takes a place: a notice reported again
@@ -234,9 +262,11 @@ manage the profile themselves.
 2. **The tenders role.** On the admin Roles page (`/admin/roles`), add a role
    named `tenders`, organisation `mcl-tenders`, that may **call**
    `get_tenders_page`, `get_tender_by_id`, `dismiss_tender`,
-   `get_tender_profile` and `describe_tender_profile`. Leave
+   `get_tender_profile` and `describe_tender_profile`, and for an agent
+   that follows the pursuit too, `pursue_tender`, `decline_tender`,
+   `submit_tender_bid` and `record_tender_outcome`. Leave
    `archive_tender_profile` out: it ends the realm's search for good.
-   *Success:* the form's preview lists the five as
+   *Success:* the form's preview lists the ones you chose as
    `mcl-tenders/<name>` under "call", and the saved role shows on the page.
 
 **For the agent.**

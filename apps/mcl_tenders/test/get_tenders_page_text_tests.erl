@@ -1,9 +1,11 @@
 %%% @doc The morning list as text: what an agent answers "any tenders today?"
 %%% with. One line per tender, best first, with title, buyer, country,
-%%% deadline and TED notice id; nothing else.
+%%% deadline and TED notice id, and where the pursuit stands once there is
+%%% one; nothing else.
 -module(get_tenders_page_text_tests).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("guide_tender_lifecycle/src/tender_status.hrl").
 
 -define(DEADLINE, 1796083200000). %% 2026-12-01T00:00:00Z
 
@@ -57,3 +59,14 @@ carries_nothing_but_the_five_fields_test() ->
 an_unknown_buyer_reads_unknown_test() ->
     Text = get_tenders_page_text:rendered([summary(#{buyer_name => <<>>, buyer_country => <<>>})]),
     ?assertMatch({match, _}, re:run(Text, "buyer: unknown \\(unknown\\)")).
+
+%% The furthest step of the pursuit, at the end of the line; none before it.
+the_pursuit_ends_the_line_test() ->
+    Line = fun(Status) -> get_tenders_page_text:rendered([summary(#{status => Status})]) end,
+    ?assertEqual(nomatch, binary:match(Line(?TENDER_SPOTTED bor ?TENDER_AMENDED), <<"pursuit">>)),
+    [?assertMatch({match, _}, re:run(Line(Status), "notice: 712345-2026 \\| pursuit: " ++ Word ++ "\\z"))
+     || {Status, Word} <- [{?TENDER_PURSUED, "pursuing"},
+                           {?TENDER_PURSUED bor ?TENDER_BID_SUBMITTED, "bid submitted"},
+                           {?TENDER_PURSUED bor ?TENDER_DECLINED, "declined"},
+                           {?TENDER_PURSUED bor ?TENDER_BID_SUBMITTED bor ?TENDER_WON, "won"},
+                           {?TENDER_PURSUED bor ?TENDER_BID_SUBMITTED bor ?TENDER_LOST, "lost"}]].

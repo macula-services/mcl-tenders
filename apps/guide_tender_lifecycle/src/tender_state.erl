@@ -34,6 +34,11 @@ apply_event(S, #{event_type := <<"tender_spotted_v1">>}) -> flagged(S, ?TENDER_S
 apply_event(S, #{event_type := <<"tender_amended_v1">>}) -> flagged(S, ?TENDER_AMENDED);
 apply_event(S, #{event_type := <<"tender_award_noted_v1">>}) -> flagged(S, ?TENDER_AWARD_PUBLISHED);
 apply_event(S, #{event_type := <<"tender_dismissed_v1">>}) -> flagged(S, ?TENDER_DISMISSED);
+apply_event(S, #{event_type := <<"tender_pursued_v1">>}) -> flagged(S, ?TENDER_PURSUED);
+apply_event(S, #{event_type := <<"tender_declined_v1">>}) -> flagged(S, ?TENDER_DECLINED);
+apply_event(S, #{event_type := <<"tender_bid_submitted_v1">>}) -> flagged(S, ?TENDER_BID_SUBMITTED);
+apply_event(S, #{event_type := <<"tender_outcome_recorded_v1">>, outcome := <<"won">>}) -> flagged(S, ?TENDER_WON);
+apply_event(S, #{event_type := <<"tender_outcome_recorded_v1">>, outcome := <<"lost">>}) -> flagged(S, ?TENDER_LOST);
 apply_event(S, _Unknown) -> S.
 
 flagged(#state{status = St} = S, Flag) ->

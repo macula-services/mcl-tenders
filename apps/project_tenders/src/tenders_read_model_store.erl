@@ -107,7 +107,18 @@ migrations() ->
          " dismissed_at       INTEGER NOT NULL DEFAULT 0,"
          " PRIMARY KEY (realm, tender_id))",
          "CREATE INDEX IF NOT EXISTS tenders_by_morning"
-         " ON tenders (realm, published_at DESC, fit_rank DESC)"]}].
+         " ON tenders (realm, published_at DESC, fit_rank DESC)"]},
+     %% The pursuit (#4b): who moved it on, and when; `outcome' is '', won or
+     %% lost. The flags themselves go into `status', as before.
+     {3, ["ALTER TABLE tenders ADD COLUMN pursued_by TEXT NOT NULL DEFAULT ''",
+          "ALTER TABLE tenders ADD COLUMN pursued_at INTEGER NOT NULL DEFAULT 0",
+          "ALTER TABLE tenders ADD COLUMN declined_by TEXT NOT NULL DEFAULT ''",
+          "ALTER TABLE tenders ADD COLUMN declined_at INTEGER NOT NULL DEFAULT 0",
+          "ALTER TABLE tenders ADD COLUMN submitted_by TEXT NOT NULL DEFAULT ''",
+          "ALTER TABLE tenders ADD COLUMN submitted_at INTEGER NOT NULL DEFAULT 0",
+          "ALTER TABLE tenders ADD COLUMN outcome TEXT NOT NULL DEFAULT ''",
+          "ALTER TABLE tenders ADD COLUMN outcome_by TEXT NOT NULL DEFAULT ''",
+          "ALTER TABLE tenders ADD COLUMN outcome_at INTEGER NOT NULL DEFAULT 0"]}].
 
 -spec start_link(string()) -> {ok, pid()} | {error, term()}.
 start_link(SqlitePath) ->
