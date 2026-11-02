@@ -120,7 +120,7 @@ every_dossier_path(Realm) ->
       fun() -> maps:get(dismissed_by, element(2, get_tender_by_id:find(Realm, <<"canary-1">>))) end,
       binary:encode_hex(?MEMBER, lowercase)),
     Live = #{realm => fun mcl_om:realm/0, profile => fun get_tender_profile:find/1,
-             noted => fun() -> ok end},
+             noted => fun() -> ok end, spotted => fun() -> ok end},
     {spot_tender, {error, store_error}} =
         on_tender_notice_reported_v1_maybe_spot_tender:handled(
           Fact(#{procedure_id => <<"canary-3">>}),

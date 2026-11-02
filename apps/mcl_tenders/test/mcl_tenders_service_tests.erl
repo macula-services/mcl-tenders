@@ -168,6 +168,7 @@ health_info_shows_the_intake_and_the_sensor_test() ->
     unlink(Pid),
     try
         ok = tender_intake:admit(),
+        ok = tender_intake:spotted(),
         persistent_term:put(sense_ted_notices,
                             {ok, #{state => sweeping, idle_reason => none, last_swept_at => Now}}),
         Up = ?SERVICE:info(),

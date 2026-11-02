@@ -18,7 +18,8 @@ Refs macula-services/mcl-tenders#4 and #11.
   profile's description comes later. Every notice is read again on arrival and
   trusts none of the fact's text. New sealed procedures for the tenders role:
   `get_tenders_page` (best first) and `get_tender_by_id`. At most
-  `MCL_TENDERS_DAILY_CAP` (500) tenders are spotted a day; `/health` info shows
+  `MCL_TENDERS_DAILY_CAP` (500) tenders are spotted a day, and only a stored
+  spot takes a place, so a re-reported notice never eats the cap; `/health` info shows
   `intake`, `sensor` and `quiet`. The process manager is subscribed to the
   sensor's sealed fact through mcl_om 1.7.0's group admission, from the
   realm's `mcl-tenders` org only, once the tenders group is set up.

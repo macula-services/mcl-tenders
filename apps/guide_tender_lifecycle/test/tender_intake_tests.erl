@@ -9,8 +9,13 @@ intake_test_() ->
      fun(Pid) -> stopped(Pid), os:unsetenv("MCL_TENDERS_DAILY_CAP") end,
      fun(_) ->
              [?_test(begin
+                         %% Asking takes no place; a stored spot does.
                          ?assertEqual(ok, tender_intake:admit()),
                          ?assertEqual(ok, tender_intake:admit()),
+                         ?assertMatch({ok, #{spotted := 0}}, tender_intake:today()),
+                         ok = tender_intake:spotted(),
+                         ?assertEqual(ok, tender_intake:admit()),
+                         ok = tender_intake:spotted(),
                          ?assertEqual(capped, tender_intake:admit()),
                          ?assertEqual(capped, tender_intake:admit()),
                          ok = tender_intake:noted(),
@@ -24,7 +29,9 @@ intake_test_() ->
 a_new_day_starts_the_count_again_test() ->
     Yesterday = #{day => {2000, 1, 1}, spotted => 500, dropped => 7, cap => 500, last_notice_at => 1},
     {reply, ok, St} = tender_intake:handle_call(admit, self(), Yesterday),
-    ?assertMatch(#{spotted := 1, dropped := 0, last_notice_at := 1}, St),
+    ?assertMatch(#{spotted := 0, dropped := 0, last_notice_at := 1}, St),
+    {reply, ok, Spotted} = tender_intake:handle_call(spotted, self(), Yesterday),
+    ?assertMatch(#{spotted := 1, dropped := 0}, Spotted),
     ?assertNotEqual({2000, 1, 1}, maps:get(day, St)).
 
 the_cap_is_a_positive_integer_or_500_test() ->

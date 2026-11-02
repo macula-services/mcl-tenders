@@ -4,7 +4,13 @@
 %%% Each UTC day at most `MCL_TENDERS_DAILY_CAP' tenders are spotted (500 by
 %%% default, far above a realm's normal share of TED's ~3,800 notices a
 %%% day); the rest of the day's spots are dropped, counted, and the first drop
-%%% is logged once, by count. The /health info shows the counts
+%%% is logged once, by count.
+%%%
+%%% CHECK, THEN COUNT. admit/0 only asks whether there is room; spotted/0
+%%% takes the place once the spot is stored. A notice the aggregate refuses
+%%% (already spotted: a restarted sensor re-reports its window) takes no
+%%% place, so repeats never eat the cap nor raise the count. One process
+%%% manager asks both, one notice at a time, so nothing comes between them. The /health info shows the counts
 %%% (mcl_tenders_service:info/0), so the operator sees the flag.
 %%%
 %%% T5: the time the last notice arrived, fitting or not, so a quiet stream
@@ -16,7 +22,7 @@
 -module(tender_intake).
 -behaviour(gen_server).
 
--export([start_link/0, admit/0, noted/0, today/0, cap/0]).
+-export([start_link/0, admit/0, spotted/0, noted/0, today/0, cap/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 -define(DEFAULT_CAP, 500).
@@ -29,11 +35,17 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% @doc `ok' to spot one more tender today, counting it; `capped' when the
-%% day's cap is reached, counting the drop. A dead counter admits nothing.
+%% @doc `ok' while today has room for one more spotted tender, counting
+%% nothing; `capped' when the day's cap is reached, counting the drop. A dead
+%% counter admits nothing.
 -spec admit() -> ok | capped.
 admit() ->
     called(admit, capped).
+
+%% @doc A tender was spotted and stored: it takes one of today's places.
+-spec spotted() -> ok.
+spotted() ->
+    called(spotted, ok).
 
 %% @doc A notice arrived, now.
 -spec noted() -> ok.
@@ -63,7 +75,10 @@ init([]) ->
     {ok, #{day => day(), spotted => 0, dropped => 0, cap => cap(), last_notice_at => 0}}.
 
 handle_call(admit, _From, St) ->
-    counted(rolled(St));
+    checked(rolled(St));
+handle_call(spotted, _From, St) ->
+    #{spotted := S} = Rolled = rolled(St),
+    {reply, ok, Rolled#{spotted := S + 1}};
 handle_call(today, _From, St) ->
     #{day := {Y, M, D}} = Rolled = rolled(St),
     Day = iolist_to_binary(io_lib:format("~4..0b-~2..0b-~2..0b", [Y, M, D])),
@@ -76,13 +91,13 @@ handle_cast(_Other, St) -> {noreply, St}.
 
 handle_info(_Info, St) -> {noreply, St}.
 
-counted(#{spotted := S, cap := Cap} = St) when S < Cap ->
-    {reply, ok, St#{spotted := S + 1}};
-counted(#{dropped := 0, cap := Cap} = St) ->
+checked(#{spotted := S, cap := Cap} = St) when S < Cap ->
+    {reply, ok, St};
+checked(#{dropped := 0, cap := Cap} = St) ->
     logger:warning("[tenders] today's intake cap of ~b spotted tenders is reached; "
                    "the rest of today's are dropped and counted (MCL_TENDERS_DAILY_CAP)", [Cap]),
     {reply, capped, St#{dropped := 1}};
-counted(#{dropped := D} = St) ->
+checked(#{dropped := D} = St) ->
     {reply, capped, St#{dropped := D + 1}}.
 
 rolled(#{day := Day} = St) -> rolled(day(), Day, St).

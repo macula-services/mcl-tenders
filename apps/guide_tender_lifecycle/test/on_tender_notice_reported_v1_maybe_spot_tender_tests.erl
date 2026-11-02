@@ -16,6 +16,7 @@ deps(Overrides) ->
     maps:merge(#{realm => fun() -> {ok, realm()} end,
                  profile => fun(_Realm) -> {ok, profile()} end,
                  admit => fun() -> ok end,
+                 spotted => fun() -> Self ! spotted, ok end,
                  noted => fun() -> Self ! noted, ok end,
                  dispatch => fun(Desk, Cmd) -> Self ! {dispatched, Desk, Cmd}, {ok, 1, []} end},
                Overrides).
@@ -73,6 +74,22 @@ the_expected_refusals_are_answers_not_faults_test() ->
 past_the_days_cap_nothing_is_spotted_test() ->
     ?assertEqual({skipped, capped}, ?PM:handled(fact(), deps(#{admit => fun() -> capped end}))),
     ?assertEqual(none, dispatched()),
+    drain().
+
+%% Only a stored spot takes a place under the day's cap: a notice the
+%% aggregate refuses as already spotted (a restarted sensor re-reports its
+%% window), or a failed store, takes none; a stored one takes exactly one.
+only_a_stored_spot_takes_a_place_under_the_cap_test() ->
+    drain(),
+    ?assertEqual({spot_tender, already_spotted},
+                 ?PM:handled(fact(), deps(#{dispatch => fun(_, _) -> {error, already_spotted} end}))),
+    receive spotted -> ?assert(false) after 0 -> ok end,
+    ?assertEqual({spot_tender, {error, store_error}},
+                 ?PM:handled(fact(), deps(#{dispatch => fun(_, _) -> {error, {store_error, x}} end}))),
+    receive spotted -> ?assert(false) after 0 -> ok end,
+    ?assertEqual({spot_tender, ok}, ?PM:handled(fact(), deps())),
+    receive spotted -> ok after 0 -> ?assert(false) end,
+    receive spotted -> ?assert(false) after 0 -> ok end,
     drain().
 
 %% The cap counts spots only: a notice that does not fit is not admitted.

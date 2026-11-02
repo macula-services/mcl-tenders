@@ -26,6 +26,7 @@
 -type deps() :: #{realm := fun(() -> {ok, <<_:256>>} | {error, term()}),
                   profile := fun((<<_:256>>) -> {ok, get_tender_profile:profile()} | {error, term()}),
                   admit := fun(() -> ok | capped),
+                  spotted := fun(() -> ok),
                   noted := fun(() -> ok),
                   dispatch := fun((atom(), term()) -> {ok, non_neg_integer(), [map()]} | {error, term()})}.
 
@@ -71,7 +72,15 @@ fitted({fits, Reasons}, Notice, Realm, #{admit := Admit} = Deps) ->
     admitted(Admit(), spot_tender_v1:new(#{realm => Realm, notice => Notice, reasons => Reasons}), Deps).
 
 admitted(capped, _Cmd, _Deps) -> {skipped, capped};
-admitted(ok, Cmd, Deps) -> sent(spot_tender, Cmd, Deps).
+admitted(ok, Cmd, Deps) -> counted(sent(spot_tender, Cmd, Deps), Deps).
+
+%% Only a stored spot takes one of today's places: a notice the aggregate
+%% refuses as already spotted, or a failed store, takes none (tender_intake).
+counted({spot_tender, ok} = Outcome, #{spotted := Spotted}) ->
+    ok = Spotted(),
+    Outcome;
+counted(Outcome, _Deps) ->
+    Outcome.
 
 sent(Desk, {ok, Cmd}, #{dispatch := Dispatch}) -> outcome(Desk, Dispatch(Desk, Cmd));
 sent(_Desk, {error, Why}, _Deps) -> {skipped, Why}.
@@ -95,6 +104,7 @@ live() ->
     #{realm => fun mcl_om:realm/0,
       profile => fun get_tender_profile:find/1,
       admit => fun tender_intake:admit/0,
+      spotted => fun tender_intake:spotted/0,
       noted => fun tender_intake:noted/0,
       dispatch => fun dispatch/2}.
 

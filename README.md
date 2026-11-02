@@ -173,7 +173,8 @@ A tender the bid team dismisses leaves the list and stays readable by id.
 
 At most `MCL_TENDERS_DAILY_CAP` tenders (500 by default) are spotted a UTC day,
 so a flood of facts cannot flood the dossiers; the rest of the day's are
-dropped and counted. `/health` shows the day's count, the drops, the cap and
+dropped and counted. Only a stored spot takes a place: a notice reported again
+(a restarted sensor re-reads its window) takes none. `/health` shows the day's count, the drops, the cap and
 when the last notice arrived (`intake`); whether the sensor sweeps or idles and
 why (`sensor`, the reason as a tag only); and `quiet: 1` while the sensor idles
 or has not finished a sweep in a day, so a quiet stream is not mistaken for a

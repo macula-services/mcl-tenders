@@ -97,6 +97,7 @@ reported(Fact) ->
       Fact, #{realm => fun mcl_om:realm/0,
               profile => fun get_tender_profile:find/1,
               admit => fun() -> ok end,
+              spotted => fun() -> ok end,
               noted => fun() -> ok end,
               dispatch => fun dispatched/2}).
 
