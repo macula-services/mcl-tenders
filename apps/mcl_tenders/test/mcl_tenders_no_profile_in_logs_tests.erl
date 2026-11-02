@@ -16,7 +16,10 @@
 %%%   - a notice that fits and one that does not, a correction, an award, a
 %%%     tender dismissed, a spot the store refuses and a spot past the day's
 %%%     cap, each carrying canaries in its codes-free text: which notices fit
-%%%     draws the profile's outline (A2).
+%%%     draws the profile's outline (A2);
+%%%   - a pursuit's document and question (#25), stored and refused, with
+%%%     canaries in the document's name and place and in the question, and
+%%%     read back.
 %%%
 %%% Then format_status/1 of both stores, on a status shaped as a crash with a
 %%% canary in the request and in the stack.
@@ -30,7 +33,7 @@
 %% ASCII, so a match in any rendering of a binary or a string is a match.
 -define(CANARIES, [<<"zqcpvkw0rd">>, <<"zqexcl0sion">>, <<"zqdescr1ption">>, <<"zqrefus3d">>,
                    <<"zqstuck">>, <<"zqraised">>, <<"zqn0tice">>, <<"zqbuy3r">>, <<"zqt1tle">>,
-                   <<"zqm1ss">>]).
+                   <<"zqm1ss">>, <<"zqd0cname">>, <<"zqpl4ce">>, <<"zqqu3stion">>]).
 
 no_profile_in_logs_test_() ->
     {setup, fun start/0, fun stop/1,
@@ -130,7 +133,28 @@ every_dossier_path(Realm) ->
         on_tender_notice_reported_v1_maybe_spot_tender:handled(
           Fact(#{procedure_id => <<"canary-4">>}),
           Live#{admit => fun() -> capped end, dispatch => fun(_, _) -> error(dispatched) end}),
+    every_paper_path(Fact),
     ok.
+
+every_paper_path(Fact) ->
+    {spot_tender, ok} = mcl_tenders_pipeline:reported(Fact(#{procedure_id => <<"canary-5">>})),
+    Id = {text, <<"canary-5">>},
+    Doc = #{tender_id => Id, name => {text, <<"zqd0cname.pdf">>},
+            sha256 => {text, binary:copy(<<"c4">>, 32)}, location => {text, <<"bids/zqpl4ce">>}},
+    Ask = #{tender_id => Id, question => {text, <<"zqqu3stion?">>}},
+    %% Refused before the pursuit, and refused for a bad digest.
+    {_, #{<<"reason">> := _}} = mcl_tenders_pipeline:call(<<"attach_tender_document">>, Doc, ?MEMBER),
+    {_, #{<<"reason">> := _}} = mcl_tenders_pipeline:call(<<"record_tender_question">>, Ask, ?MEMBER),
+    {_, #{}} = mcl_tenders_pipeline:call(<<"pursue_tender">>, #{tender_id => Id}, ?MEMBER),
+    {_, #{<<"reason">> := _}} =
+        mcl_tenders_pipeline:call(<<"attach_tender_document">>,
+                                  Doc#{sha256 => {text, <<"zqd0cname">>}}, ?MEMBER),
+    {_, #{}} = mcl_tenders_pipeline:call(<<"attach_tender_document">>, Doc, ?MEMBER),
+    {_, #{}} = mcl_tenders_pipeline:call(<<"record_tender_question">>, Ask, ?MEMBER),
+    mcl_tenders_pipeline:eventually(
+      fun() -> {_, R} = mcl_tenders_pipeline:call(<<"get_tender_pursuit">>, #{tender_id => Id}, ?MEMBER),
+               {length(maps:get(<<"documents">>, R, [])), length(maps:get(<<"questions">>, R, []))}
+      end, {1, 1}).
 
 format_status_keeps_no_argument_test_() ->
     Status = #{state => kept, log => [{in, {exec, "SQL", [<<"zqfmt">>]}}],

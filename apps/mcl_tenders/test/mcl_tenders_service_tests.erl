@@ -65,7 +65,7 @@ info_version_matches_the_application_test() ->
 health_is_green_test() ->
     ?assertEqual(ok, ?SERVICE:health()).
 
-%% The profile's three procedures and nothing else, each served by a module that
+%% The profile's, the morning list's and the pursuit's procedures and nothing else, each served by a module that
 %% implements macula_response. Changing the list breaks this test on purpose.
 %%
 %% T2, as declared: every one admits the tenders role only, `{callers, role}',
@@ -74,7 +74,10 @@ health_is_green_test() ->
 announces_the_procedures_for_the_tenders_role_only_test() ->
     Caps = without_org_key(fun ?SERVICE:capabilities/0),
     ?assertEqual([<<"describe_tender_profile">>, <<"get_tender_profile">>, <<"archive_tender_profile">>,
-                  <<"get_tenders_page">>, <<"get_tender_by_id">>, <<"dismiss_tender">>],
+                  <<"get_tenders_page">>, <<"get_tender_by_id">>, <<"dismiss_tender">>,
+                  <<"pursue_tender">>, <<"decline_tender">>, <<"submit_tender_bid">>,
+                  <<"record_tender_outcome">>, <<"attach_tender_document">>,
+                  <<"record_tender_question">>, <<"get_tender_pursuit">>],
                  [N || #{name := N} <- Caps]),
     ?assertEqual([required], lists:usort([maps:get(confidential, C, absent) || C <- Caps])),
     ?assertEqual([{callers, role}], lists:usort([maps:get(auth, C, absent) || C <- Caps])),

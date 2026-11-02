@@ -1,7 +1,9 @@
 %%% @doc The tender dossier through the whole released pipeline, with no mesh:
 %%% a reported notice spotted against the realm's profile, the morning list and
 %%% the dossier read back, a correction, the award, a dismissal by a role
-%%% holder's call, and the read model's shape held to what the desks select.
+%%% holder's call, a pursuit from bid to outcome and one declined, a pursuit's
+%%% documents and questions, and the read
+%%% model's shape held to what the desks select.
 -module(mcl_tenders_dossier_tests).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -23,6 +25,10 @@ dossier_test_() ->
       {timeout, 60, fun a_correction_replaces_what_it_gives/0},
       {timeout, 60, fun the_award_is_noted_on_the_dossier/0},
       {timeout, 60, fun a_dismissal_hides_the_tender_and_names_the_caller/0},
+      {timeout, 60, fun a_pursuit_runs_from_bid_to_outcome_and_names_each_caller/0},
+      {timeout, 60, fun a_declined_pursuit_reads_declined/0},
+      {timeout, 60, fun a_lost_pursuit_reads_lost/0},
+      {timeout, 60, fun a_pursuit_keeps_its_documents_and_questions/0},
       {timeout, 60, fun the_list_is_best_first_and_bounded/0},
       {timeout, 60, fun a_correction_projected_before_its_spot_is_kept/0},
       {timeout, 60, fun a_correction_of_a_tender_never_spotted_is_not_listed/0},
@@ -146,6 +152,154 @@ a_dismissal_hides_the_tender_and_names_the_caller() ->
                  mcl_tenders_pipeline:call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}},
                                            undefined)).
 
+%% Spotted with a publication time before the later tests' `since', so the
+%% pursuits here stay off the pages those tests count.
+spotted_early(Id) ->
+    {spot_tender, ok} = mcl_tenders_pipeline:reported(fact(#{procedure_id => Id, published_at => 10})).
+
+pursuit_call(Name, Id, Extra, Caller) ->
+    mcl_tenders_pipeline:call(Name, maps:merge(#{tender_id => {text, Id}}, Extra), Caller).
+
+%% T13: every step of the pursuit names the node that signed its call, never a
+%% payload field; the text list says where it stands.
+a_pursuit_runs_from_bid_to_outcome_and_names_each_caller() ->
+    Id = <<"pursuit-won-1">>,
+    spotted_early(Id),
+    Forged = {text, <<"someone-else">>},
+    ?assertEqual({<<"pursue_tender">>, #{}},
+                 pursuit_call(<<"pursue_tender">>, Id, #{pursued_by => Forged}, ?MEMBER)),
+    ?assertEqual({<<"dismiss_tender">>, #{<<"reason">> => {text, <<"pursued">>}}},
+                 pursuit_call(<<"dismiss_tender">>, Id, #{}, ?MEMBER)),
+    ?assertEqual({<<"record_tender_outcome">>, #{<<"reason">> => {text, <<"not_submitted">>}}},
+                 pursuit_call(<<"record_tender_outcome">>, Id, #{outcome => {text, <<"won">>}}, ?MEMBER)),
+    ?assertEqual({<<"submit_tender_bid">>, #{}},
+                 pursuit_call(<<"submit_tender_bid">>, Id, #{submitted_by => Forged}, ?MEMBER)),
+    ?assertEqual({<<"record_tender_outcome">>, #{<<"reason">> => {text, <<"invalid_outcome">>}}},
+                 pursuit_call(<<"record_tender_outcome">>, Id, #{outcome => {text, <<"draw">>}}, ?MEMBER)),
+    ?assertEqual({<<"record_tender_outcome">>, #{}},
+                 pursuit_call(<<"record_tender_outcome">>, Id,
+                              #{outcome => {text, <<"won">>}, recorded_by => Forged}, ?MEMBER)),
+    ?assertEqual({<<"record_tender_outcome">>, #{<<"reason">> => {text, <<"already_recorded">>}}},
+                 pursuit_call(<<"record_tender_outcome">>, Id, #{outcome => {text, <<"lost">>}}, ?MEMBER)),
+    ?assertEqual({<<"decline_tender">>, #{<<"reason">> => {text, <<"already_submitted">>}}},
+                 pursuit_call(<<"decline_tender">>, Id, #{}, ?MEMBER)),
+    Won = ?TENDER_SPOTTED bor ?TENDER_PURSUED bor ?TENDER_BID_SUBMITTED bor ?TENDER_WON,
+    mcl_tenders_pipeline:eventually(field(Id, status), Won),
+    mcl_tenders_pipeline:eventually(field(Id, outcome), <<"won">>),
+    {ok, D} = by_id(Id),
+    Me = binary:encode_hex(?MEMBER, lowercase),
+    ?assertMatch(#{pursued_by := Me, submitted_by := Me, outcome_by := Me,
+                   declined_by := <<>>, declined_at := 0}, D),
+    [?assert(maps:get(K, D) > 0) || K <- [pursued_at, submitted_at, outcome_at]],
+    {ok, #{text := Text}} = get_tenders_page:find(realm(), #{since => 10, limit => 100}),
+    ?assertMatch({match, _}, re:run(Text, "\\| pursuit: won\n|\\| pursuit: won\\z")),
+    [?assertEqual({Name, #{<<"reason">> => {text, <<"no_caller">>}}},
+                  pursuit_call(Name, Id, #{outcome => {text, <<"won">>}}, undefined))
+     || Name <- [<<"pursue_tender">>, <<"decline_tender">>, <<"submit_tender_bid">>,
+                 <<"record_tender_outcome">>]],
+    [?assertEqual({Name, #{<<"reason">> => {text, <<"not_found">>}}},
+                  pursuit_call(Name, <<"never-1">>, #{outcome => {text, <<"won">>}}, ?MEMBER))
+     || Name <- [<<"pursue_tender">>, <<"decline_tender">>, <<"submit_tender_bid">>,
+                 <<"record_tender_outcome">>]].
+
+a_declined_pursuit_reads_declined() ->
+    Id = <<"pursuit-declined-1">>,
+    spotted_early(Id),
+    ?assertEqual({<<"decline_tender">>, #{<<"reason">> => {text, <<"not_pursued">>}}},
+                 pursuit_call(<<"decline_tender">>, Id, #{}, ?MEMBER)),
+    ?assertEqual({<<"pursue_tender">>, #{}}, pursuit_call(<<"pursue_tender">>, Id, #{}, ?MEMBER)),
+    ?assertEqual({<<"pursue_tender">>, #{<<"reason">> => {text, <<"already_pursued">>}}},
+                 pursuit_call(<<"pursue_tender">>, Id, #{}, ?MEMBER)),
+    ?assertEqual({<<"decline_tender">>, #{}},
+                 pursuit_call(<<"decline_tender">>, Id, #{declined_by => {text, <<"someone-else">>}},
+                              ?MEMBER)),
+    ?assertEqual({<<"submit_tender_bid">>, #{<<"reason">> => {text, <<"declined">>}}},
+                 pursuit_call(<<"submit_tender_bid">>, Id, #{}, ?MEMBER)),
+    mcl_tenders_pipeline:eventually(field(Id, status),
+                                    ?TENDER_SPOTTED bor ?TENDER_PURSUED bor ?TENDER_DECLINED),
+    Me = binary:encode_hex(?MEMBER, lowercase),
+    ?assertMatch({ok, #{declined_by := Me, submitted_by := <<>>, outcome := <<>>}}, by_id(Id)),
+    %% The dismissed tender of the test before is not pursued.
+    ?assertEqual({<<"pursue_tender">>, #{<<"reason">> => {text, <<"dismissed">>}}},
+                 pursuit_call(<<"pursue_tender">>, ?TENDER, #{}, ?MEMBER)).
+
+%% The projection's LOST flag, read back against tender_status.hrl.
+a_lost_pursuit_reads_lost() ->
+    Id = <<"pursuit-lost-1">>,
+    spotted_early(Id),
+    [?assertEqual({Name, #{}}, pursuit_call(Name, Id, Extra, ?MEMBER))
+     || {Name, Extra} <- [{<<"pursue_tender">>, #{}}, {<<"submit_tender_bid">>, #{}},
+                          {<<"record_tender_outcome">>, #{outcome => {text, <<"lost">>}}}]],
+    mcl_tenders_pipeline:eventually(
+      field(Id, status), ?TENDER_SPOTTED bor ?TENDER_PURSUED bor ?TENDER_BID_SUBMITTED bor ?TENDER_LOST),
+    ?assertMatch({ok, #{outcome := <<"lost">>}}, by_id(Id)).
+
+%% #25: the bid team's papers on a pursued tender, each naming the node that
+%% signed its call (T13), read back by get_tender_pursuit only.
+a_pursuit_keeps_its_documents_and_questions() ->
+    Id = <<"pursuit-papers-1">>,
+    spotted_early(Id),
+    Sha = binary:copy(<<"5a">>, 32),
+    Doc = #{name => {text, <<"Offerte.pdf">>}, sha256 => {text, Sha},
+            location => {text, <<"bids/2026/offerte.pdf">>}},
+    Ask = #{question => {text, <<"Mag de dienst gehost worden?\nZo ja, waar?">>}},
+    ?assertEqual({<<"attach_tender_document">>, #{<<"reason">> => {text, <<"not_pursued">>}}},
+                 pursuit_call(<<"attach_tender_document">>, Id, Doc, ?MEMBER)),
+    ?assertEqual({<<"record_tender_question">>, #{<<"reason">> => {text, <<"not_pursued">>}}},
+                 pursuit_call(<<"record_tender_question">>, Id, Ask, ?MEMBER)),
+    ?assertEqual({<<"pursue_tender">>, #{}}, pursuit_call(<<"pursue_tender">>, Id, #{}, ?MEMBER)),
+    Forged = {text, <<"someone-else">>},
+    ?assertEqual({<<"attach_tender_document">>, #{}},
+                 pursuit_call(<<"attach_tender_document">>, Id, Doc#{attached_by => Forged}, ?MEMBER)),
+    ?assertEqual({<<"record_tender_question">>, #{}},
+                 pursuit_call(<<"record_tender_question">>, Id, Ask#{recorded_by => Forged}, ?MEMBER)),
+    %% The same question again, by another role holder, is the same question
+    %% and keeps who asked it first; the same digest again moves the document.
+    ?assertEqual({<<"record_tender_question">>, #{}},
+                 pursuit_call(<<"record_tender_question">>, Id, Ask, <<16#b2:256>>)),
+    Moved = Doc#{location => {text, <<"bids/2026/final/offerte.pdf">>}},
+    ?assertEqual({<<"attach_tender_document">>, #{}},
+                 pursuit_call(<<"attach_tender_document">>, Id, Moved, ?MEMBER)),
+    Other = Doc#{name => {text, <<"Bijlage.xlsx">>}, sha256 => {text, binary:copy(<<"6b">>, 32)}},
+    ?assertEqual({<<"attach_tender_document">>, #{}},
+                 pursuit_call(<<"attach_tender_document">>, Id, Other, ?MEMBER)),
+    Papers = fun() -> {ok, P} = get_tender_pursuit:find(realm(), Id),
+                      {length(maps:get(documents, P)), length(maps:get(questions, P))} end,
+    mcl_tenders_pipeline:eventually(Papers, {2, 1}),
+    mcl_tenders_pipeline:eventually(
+      fun() -> {ok, #{documents := Ds}} = get_tender_pursuit:find(realm(), Id),
+               [L || #{sha256 := S, location := L} <- Ds, S =:= Sha] end,
+      [<<"bids/2026/final/offerte.pdf">>]),
+    Me = binary:encode_hex(?MEMBER, lowercase),
+    {ok, #{documents := Docs, questions := [Q]}} = get_tender_pursuit:find(realm(), Id),
+    [?assertMatch(#{attached_by := Me, attached_at := At} when At > 0, D) || D <- Docs],
+    ?assertMatch(#{question := <<"Mag de dienst gehost worden?\nZo ja, waar?">>, recorded_by := Me,
+                   recorded_at := At} when At > 0, Q),
+    ?assertEqual(binary:encode_hex(crypto:hash(sha256, maps:get(question, Q)), lowercase),
+                 maps:get(question_id, Q)),
+    %% The papers add no flag and stay out of the dossier.
+    {ok, D} = by_id(Id),
+    ?assertEqual(?TENDER_SPOTTED bor ?TENDER_PURSUED, maps:get(status, D)),
+    ?assertNot(maps:is_key(documents, D) orelse maps:is_key(questions, D)),
+    [?assertEqual({Name, #{<<"reason">> => {text, Why}}}, pursuit_call(Name, Id, Extra, ?MEMBER))
+     || {Name, Extra, Why} <- [{<<"attach_tender_document">>, Doc#{sha256 => {text, <<"AB">>}},
+                                <<"invalid_sha256">>},
+                               {<<"attach_tender_document">>, maps:remove(name, Doc),
+                                <<"invalid_document_name">>},
+                               {<<"attach_tender_document">>, maps:remove(location, Doc),
+                                <<"invalid_location">>},
+                               {<<"record_tender_question">>, #{}, <<"invalid_question">>}]],
+    [?assertEqual({Name, #{<<"reason">> => {text, <<"no_caller">>}}},
+                  pursuit_call(Name, Id, maps:merge(Doc, Ask), undefined))
+     || Name <- [<<"attach_tender_document">>, <<"record_tender_question">>]],
+    [?assertEqual({Name, #{<<"reason">> => {text, <<"not_found">>}}},
+                  pursuit_call(Name, <<"never-1">>, maps:merge(Doc, Ask), ?MEMBER))
+     || Name <- [<<"attach_tender_document">>, <<"record_tender_question">>, <<"get_tender_pursuit">>]],
+    ?assertEqual({ok, #{documents => [], questions => []}},
+                 get_tender_pursuit:find(realm(), <<"pursuit-won-1">>)),
+    ?assertEqual({error, invalid_tender_id}, get_tender_pursuit:find(realm(), <<>>)),
+    ?assertEqual({error, invalid_realm}, get_tender_pursuit:find(<<"io.example">>, Id)).
+
 %% Most keywords hit first, then the newest; `since' and `limit' bound it.
 the_list_is_best_first_and_bounded() ->
     Spot = fun(Id, Published, Description) ->
@@ -223,7 +377,11 @@ every_selected_column_is_in_the_schema_test() ->
      || {Desk, Table, Columns} <- [{get_tenders_page, "tenders", get_tenders_page:columns()},
                                    {get_tender_by_id, "tenders", get_tender_by_id:columns()},
                                    {get_tender_profile, "tender_profiles",
-                                    get_tender_profile:columns()}]].
+                                    get_tender_profile:columns()},
+                                   {get_tender_pursuit, "tender_documents",
+                                    get_tender_pursuit:document_columns()},
+                                   {get_tender_pursuit, "tender_questions",
+                                    get_tender_pursuit:question_columns()}]].
 
 %% A table's columns, as the schema creates it and every migration since adds
 %% to it: what a box has after its boot, whichever release it started on.
@@ -232,7 +390,7 @@ table_columns(Table) ->
         ++ lists:append([S || {_Version, S} <- tenders_read_model_store:migrations()]),
     [Create] = [S || S <- Statements,
                      string:prefix(S, "CREATE TABLE IF NOT EXISTS " ++ Table ++ " (") =/= nomatch],
-    {match, Names} = re:run(Create, "[(,] *([a-z_]+) +(?:TEXT|INTEGER)",
+    {match, Names} = re:run(Create, "[(,] *([a-z_0-9]+) +(?:TEXT|INTEGER)",
                            [global, {capture, all_but_first, list}]),
     Added = [Column || S <- Statements,
                        {match, [Column]} <- [re:run(S, "^ALTER TABLE " ++ Table ++ " ADD COLUMN ([a-z_]+) ",

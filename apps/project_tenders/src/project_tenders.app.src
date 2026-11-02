@@ -1,6 +1,6 @@
 {application, project_tenders, [
     {description, "PRJ: projects the process's events into the SQLite read model query_tenders answers from"},
-    {vsn, "0.3.1"},
+    {vsn, "0.4.0"},
     {registered, [project_tenders_sup, tenders_read_model_store]},
     {mod, {project_tenders_app, []}},
     {applications, [

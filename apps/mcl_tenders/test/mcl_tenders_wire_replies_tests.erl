@@ -16,6 +16,8 @@
 
 -define(MEMBER, <<16#a1:256>>).
 -define(TENDER, <<"85e562c1-17d1-4192-a543-082edb9b62ab">>).
+-define(DECLINED, <<"wire-declined-1">>).
+-define(DISMISSED, <<"wire-dismissed-1">>).
 -define(PROFILE, [<<"cpv_codes">>, <<"countries">>, <<"described_at">>, <<"described_by">>,
                   <<"description">>, <<"exclusions">>, <<"keywords">>]).
 -define(DOSSIER, [<<"tender_id">>, <<"publication_number">>, <<"procedure_id">>, <<"notice_type">>,
@@ -24,7 +26,10 @@
                   <<"estimated_value">>, <<"currency">>, <<"published_at">>, <<"status">>,
                   <<"matched_cpv_codes">>, <<"matched_keywords">>, <<"spotted_at">>,
                   <<"corrected_by">>, <<"amended_at">>, <<"award_publication_number">>,
-                  <<"award_published_at">>, <<"dismissed_by">>, <<"dismissed_at">>, <<"ted_url">>]).
+                  <<"award_published_at">>, <<"dismissed_by">>, <<"dismissed_at">>,
+                  <<"pursued_by">>, <<"pursued_at">>, <<"declined_by">>, <<"declined_at">>,
+                  <<"submitted_by">>, <<"submitted_at">>, <<"outcome">>, <<"outcome_by">>,
+                  <<"outcome_at">>, <<"ted_url">>]).
 
 %% THE TABLE. Per procedure: the keys every success reply carries, and the keys
 %% it may carry.
@@ -34,7 +39,14 @@ replies() ->
      {<<"archive_tender_profile">>,  {[], []}},
      {<<"get_tenders_page">>,        {[<<"tenders">>, <<"text">>], []}},
      {<<"get_tender_by_id">>,        {?DOSSIER, []}},
-     {<<"dismiss_tender">>,          {[], []}}].
+     {<<"dismiss_tender">>,          {[], []}},
+     {<<"pursue_tender">>,           {[], []}},
+     {<<"decline_tender">>,          {[], []}},
+     {<<"submit_tender_bid">>,       {[], []}},
+     {<<"record_tender_outcome">>,   {[], []}},
+     {<<"attach_tender_document">>,  {[], []}},
+     {<<"record_tender_question">>,  {[], []}},
+     {<<"get_tender_pursuit">>,      {[<<"documents">>, <<"questions">>], []}}].
 
 %% One entry of the morning list, and the whole dossier.
 summary_keys() ->
@@ -65,6 +77,14 @@ every_refusal_and_every_success_conforms() ->
                 call(<<"get_tenders_page">>, #{limit => 0}, ?MEMBER),
                 call(<<"get_tender_by_id">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
                 call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"pursue_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"decline_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"submit_tender_bid">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"record_tender_outcome">>, #{tender_id => {text, ?TENDER},
+                                                   outcome => {text, <<"won">>}}, ?MEMBER),
+                call(<<"attach_tender_document">>, document(), ?MEMBER),
+                call(<<"record_tender_question">>, question(), ?MEMBER),
+                call(<<"get_tender_pursuit">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
                 call(<<"archive_tender_profile">>, #{}, ?MEMBER)],
     [?assertMatch({_, [<<"reason">>], {text, _}},
                   {Name, maps:keys(Reply), maps:get(<<"reason">>, Reply)})
@@ -86,9 +106,22 @@ every_refusal_and_every_success_conforms() ->
     {_, Page} = Listed = call(<<"get_tenders_page">>, #{since => 0, limit => 10}, ?MEMBER),
     [Entry] = maps:get(<<"tenders">>, Page),
     ?assertEqual(summary_keys(), lists:sort(maps:keys(Entry))),
+    %% Two more tenders: one the bid team declines, one it dismisses, since a
+    %% pursued tender is no longer dismissed and a submitted one not declined.
+    [{spot_tender, ok} = mcl_tenders_pipeline:reported(tender_notice_fixture:fact(#{procedure_id => Id}))
+     || Id <- [?DECLINED, ?DISMISSED]],
     Successes = [Described, call(<<"get_tender_profile">>, #{}, ?MEMBER), Listed,
                  call(<<"get_tender_by_id">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
-                 call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                 call(<<"dismiss_tender">>, #{tender_id => {text, ?DISMISSED}}, ?MEMBER),
+                 call(<<"pursue_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                 call(<<"submit_tender_bid">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                 call(<<"record_tender_outcome">>, #{tender_id => {text, ?TENDER},
+                                                    outcome => {text, <<"lost">>}}, ?MEMBER),
+                 call(<<"attach_tender_document">>, document(), ?MEMBER),
+                 call(<<"record_tender_question">>, question(), ?MEMBER),
+                 pursuit_with_papers(),
+                 call(<<"pursue_tender">>, #{tender_id => {text, ?DECLINED}}, ?MEMBER),
+                 call(<<"decline_tender">>, #{tender_id => {text, ?DECLINED}}, ?MEMBER),
                  %% Last, because archived is terminal.
                  call(<<"archive_tender_profile">>, #{}, ?MEMBER)],
     [?assertEqual({Name, conforms}, {Name, conforms(Name, Reply)}) || {Name, Reply} <- Successes],
@@ -104,7 +137,30 @@ every_refusal_and_every_success_conforms() ->
     %% a list of `{lang, title}', a language never a map key.
     {_, Dossier} = lists:nth(4, Successes),
     [?assert(texts(V) orelse is_integer(V)) || V <- maps:values(maps:remove(<<"titles">>, Dossier))],
-    [?assertEqual([<<"lang">>, <<"title">>], lists:sort(maps:keys(T))) || T <- maps:get(<<"titles">>, Dossier)].
+    [?assertEqual([<<"lang">>, <<"title">>], lists:sort(maps:keys(T))) || T <- maps:get(<<"titles">>, Dossier)],
+    %% The pursuit's papers: a list of documents and a list of questions, each
+    %% a map of text and integers.
+    {_, #{<<"documents">> := [Doc], <<"questions">> := [Q]}} = lists:nth(11, Successes),
+    ?assertEqual([<<"attached_at">>, <<"attached_by">>, <<"location">>, <<"name">>, <<"sha256">>],
+                 lists:sort(maps:keys(Doc))),
+    ?assertEqual([<<"question">>, <<"question_id">>, <<"recorded_at">>, <<"recorded_by">>],
+                 lists:sort(maps:keys(Q))),
+    [?assert(texts(V) orelse is_integer(V)) || V <- maps:values(Doc) ++ maps:values(Q)].
+
+document() ->
+    #{tender_id => {text, ?TENDER}, name => {text, <<"offer.pdf">>},
+      sha256 => {text, binary:copy(<<"ab">>, 32)}, location => {text, <<"bids/offer.pdf">>}}.
+
+question() ->
+    #{tender_id => {text, ?TENDER}, question => {text, <<"Is a hosted service allowed?">>}}.
+
+%% Once the projections caught up, so the reply carries one of each.
+pursuit_with_papers() ->
+    Read = fun() -> call(<<"get_tender_pursuit">>, #{tender_id => {text, ?TENDER}}, ?MEMBER) end,
+    mcl_tenders_pipeline:eventually(
+      fun() -> {_, R} = Read(), {length(maps:get(<<"documents">>, R, [])),
+                                 length(maps:get(<<"questions">>, R, []))} end, {1, 1}),
+    Read().
 
 call(Name, Args, Caller) -> mcl_tenders_pipeline:call(Name, Args, Caller).
 
