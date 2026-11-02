@@ -138,9 +138,11 @@ memory until it restarts; it is never logged.
 under a logger that keeps every event, including a stuck and a crashing store,
 and fails if a canary turns up.
 
-Known limits. The realm is the trust boundary: anyone the realm grants the
-tenders role reads and replaces the whole profile, and can archive it, which
-cannot be undone. Events are permanent: a
+Known limits. The realm is the trust boundary, and it grants each procedure
+on its own: a capability minted for `describe_tender_profile` does not admit
+`archive_tender_profile`, so a realm can let many read and describe the profile
+while few may archive it, which cannot be undone. Whoever is granted
+`describe_tender_profile` replaces the whole profile. Events are permanent: a
 description, once given, stays in the event store after it is replaced, even
 though no query shows it. Back the store up as you would the bid strategy it
 holds.

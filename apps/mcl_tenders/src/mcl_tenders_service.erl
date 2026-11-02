@@ -52,7 +52,7 @@
 %% never a notice or a profile.
 info() ->
     #{name => <<"mcl-tenders">>,
-      version => <<"0.1.1">>,
+      version => <<"0.3.0">>,
       description => <<"Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node">>,
       sealing => sealing(tender_notices_group:missing()),
       intake => intake(tender_intake:today()),

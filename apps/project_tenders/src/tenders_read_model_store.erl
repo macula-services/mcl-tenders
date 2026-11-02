@@ -10,7 +10,11 @@
 %% it and never changes; migrations/0 is every change since, each applied once,
 %% in a transaction, on the boot that finds the file's PRAGMA user_version
 %% below it. A box that ran an earlier release keeps its rows; a new file goes
-%% through the same steps.
+%% through the same steps. A step that fails is rolled back whole and the
+%% store stops with {migration_failed, Version, SQLite's error}. A file whose
+%% user_version is above the last step here (an older image on a newer file)
+%% is refused with {schema_newer_than_release, FileVersion, Known}: this code
+%% does not know that schema, so it does not serve it.
 %%
 %% Every write is one upsert that sets only the columns of the event it
 %% projects, so events of one stream may arrive in any order. The description
@@ -135,7 +139,13 @@ opened({ok, Conn}) -> schemed(Conn, migrated(Conn, create_schema(Conn, pragmas()
 opened({error, Reason}) -> {stop, {open_failed, Reason}}.
 
 schemed(Conn, ok) -> {ok, #state{conn = Conn}};
-schemed(_Conn, {error, Reason}) -> {stop, {schema_failed, Reason}}.
+schemed(Conn, {error, {migration_failed, _, _} = Reason}) -> stopped(Conn, Reason);
+schemed(Conn, {error, {schema_newer_than_release, _, _} = Reason}) -> stopped(Conn, Reason);
+schemed(Conn, {error, Reason}) -> stopped(Conn, {schema_failed, Reason}).
+
+stopped(Conn, Reason) ->
+    _ = esqlite3:close(Conn),
+    {stop, Reason}.
 
 handle_call({exec, Sql, Args}, _From, #state{conn = Conn} = State) ->
     {reply, written(queried(Conn, Sql, Args)), State};
@@ -193,8 +203,14 @@ next_ddl({error, _} = E, _Conn, _Rest) -> E.
 
 %% Each migration above the file's user_version, in order, one transaction
 %% each: its statements and the version it brings the file to, or none of it.
-migrated(Conn, ok) -> migrate(Conn, user_version(Conn), migrations());
+migrated(Conn, ok) -> known(user_version(Conn), last_version(), Conn);
 migrated(_Conn, {error, _} = E) -> E.
+
+known(At, Last, _Conn) when At > Last -> {error, {schema_newer_than_release, At, Last}};
+known(At, _Last, Conn) -> migrate(Conn, At, migrations()).
+
+last_version() ->
+    lists:max([0 | [Version || {Version, _Statements} <- migrations()]]).
 
 user_version(Conn) ->
     [[Version]] = esqlite3:q(Conn, "PRAGMA user_version"),
@@ -213,9 +229,11 @@ transaction(Version, Statements) ->
 
 stepped(ok, Conn, Version, Rest) ->
     migrate(Conn, Version, Rest);
-stepped({error, _} = E, Conn, _Version, _Rest) ->
+stepped({error, _}, Conn, Version, _Rest) ->
+    %% Read before the ROLLBACK, which would replace it.
+    Info = esqlite3:error_info(Conn),
     _ = esqlite3:exec(Conn, "ROLLBACK"),
-    E.
+    {error, {migration_failed, Version, Info}}.
 
 written([]) -> ok;
 written({error, _} = E) -> E;
