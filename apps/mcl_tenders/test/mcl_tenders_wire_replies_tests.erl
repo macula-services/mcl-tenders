@@ -93,10 +93,6 @@ every_refusal_and_every_success_conforms() ->
                         absent) end,
       [{text, <<"BEL">>}, {text, <<"NLD">>}]),
     {spot_tender, ok} = mcl_tenders_pipeline:reported(tender_notice_fixture:fact()),
-    %% Two more tenders: one the bid team declines, one it dismisses, since a
-    %% pursued tender is no longer dismissed and a submitted one not declined.
-    [{spot_tender, ok} = mcl_tenders_pipeline:reported(tender_notice_fixture:fact(#{procedure_id => Id}))
-     || Id <- [?DECLINED, ?DISMISSED]],
     mcl_tenders_pipeline:eventually(
       fun() -> maps:is_key(<<"reason">>, element(2, call(<<"get_tender_by_id">>,
                                                          #{tender_id => {text, ?TENDER}}, ?MEMBER)))
@@ -104,6 +100,10 @@ every_refusal_and_every_success_conforms() ->
     {_, Page} = Listed = call(<<"get_tenders_page">>, #{since => 0, limit => 10}, ?MEMBER),
     [Entry] = maps:get(<<"tenders">>, Page),
     ?assertEqual(summary_keys(), lists:sort(maps:keys(Entry))),
+    %% Two more tenders: one the bid team declines, one it dismisses, since a
+    %% pursued tender is no longer dismissed and a submitted one not declined.
+    [{spot_tender, ok} = mcl_tenders_pipeline:reported(tender_notice_fixture:fact(#{procedure_id => Id}))
+     || Id <- [?DECLINED, ?DISMISSED]],
     Successes = [Described, call(<<"get_tender_profile">>, #{}, ?MEMBER), Listed,
                  call(<<"get_tender_by_id">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
                  call(<<"dismiss_tender">>, #{tender_id => {text, ?DISMISSED}}, ?MEMBER),
