@@ -3,8 +3,9 @@
 *This exists so a reader can see what mcl-tenders talks to, and what it is made
 of, before any of it is built.*
 
-**Status: the profile slice (#3) and the sensor (#2) are built; the rest of the
-model is ahead of the code.** Level 3 below shows both as built. The model follows the Boundary as Raf amended
+**Status: the profile slice (#3), the sensor (#2) and the morning list (#4, first
+step) are built; the rest of the model is ahead of the code.** Level 3 below shows
+them as built. The model follows the Boundary as Raf amended
 it on macula-services/mcl-tenders#1: each realm runs its own mcl-tenders, the
 realm is the trust boundary, the sensor is filtered by the realm's own profile,
 and the profile is set in a LAN-facing admin UI. Dashed boxes are later work
@@ -74,13 +75,13 @@ process's subscription names `sources => {org, <<"mcl-tenders">>}`: nodes the
 realm delegated to the mcl-tenders org, which runs both the sensor and the process. A sensor that is redeployed with a new node id
 keeps working, and no other realm member can feed it a notice.
 
-## Level 3: components, the profile slice and the sensor
+## Level 3: components, the profile, the sensor and the morning list
 
-![mcl-tenders components: the profile slice and the sensor](../assets/c4-components.svg)
+![mcl-tenders components: the profile, the sensor and the morning list](../assets/c4-components.svg)
 
 | Component | App | Responsibility |
 | --- | --- | --- |
-| `mcl_tenders_service` | `mcl_tenders` | The mcl_om service contract. Announces `describe_tender_profile`, `get_tender_profile` and `archive_tender_profile`, sealed, `{callers, role}`. At boot it initiates the realm's profile through `maybe_initiate_tender_profile:for_realm/1`; on every later boot the profile is already there |
+| `mcl_tenders_service` | `mcl_tenders` | The mcl_om service contract. Announces `describe_tender_profile`, `get_tender_profile`, `archive_tender_profile`, `get_tenders_page`, `get_tender_by_id` and `dismiss_tender`, sealed, `{callers, role}`. At boot it initiates the realm's profile through `maybe_initiate_tender_profile:for_realm/1`; on every later boot the profile is already there. Its `/health` info carries `intake`, `sensor` and `quiet`: counts, tags and times only |
 | `describe_tender_profile_responder` | `guide_tender_lifecycle` | Builds `describe_tender_profile_v1` from the payload: every field bounded and its text in NFC, the caller recorded as `described_by`. Replies `{}` or a reason |
 | `archive_tender_profile_responder` | `guide_tender_lifecycle` | Builds `archive_tender_profile_v1` with the caller recorded as `archived_by`. Replies `{}` or a reason. Archived is terminal: the aggregate refuses a second archive and any later description |
 | `tender_profile_aggregate` | `guide_tender_lifecycle` | One dossier per realm, stream `tenderprofile-<hash of the realm>`. Its state holds the realm and status flags only: the profile itself is in the events, never in a process's state |
@@ -91,6 +92,11 @@ keeps working, and no other realm member can feed it a notice.
 | `tenders.sqlite3` | SQLite | The read model, beside the store |
 | `sense_ted_notices` | `sense_tender_notices` | The sweep. Reads the profile through `get_tender_profile:find/1` before each one, checks the codes again, and asks TED for the days, the CPV codes and the countries. Reports each new notice through `mcl_tenders_facts:report/1`, sealed under `tender_notices_group`. Idle, asking TED nothing, without a usable profile (none, no code or country, or archived) or without the group's two variables |
 | `tender_notices_group` | `sense_tender_notices` | The group: prefix `<realm name>/mcl-tenders/tenders`, org `mcl-tenders`. Answers which variables are missing, by name, and the sealed publish options; reads the grant at the moment of a publish and never logs it |
+| `on_tender_notice_reported_v1_maybe_spot_tender` | `guide_tender_lifecycle` | The process manager. Reads each notice again (`tender_notice`: a publication number not in TED's form drops it, codes and text are checked and bounded, a link is never read). A contract notice or prior information notice that `tender_fit` passes (country, CPV hierarchy, exclusions, keywords; keywords only for now) and `tender_intake` admits under the day's cap goes to `spot_tender`; a correction to `amend_tender`; an award to `note_tender_award`. Subscribed by `mcl_tenders_service:subscriptions/0` to the sensor's sealed fact, sources the realm's `mcl-tenders` org, with the group's admission read per subscribe attempt (mcl_om 1.7.0); declared only once the group is set up |
+| `tender_aggregate` | `guide_tender_lifecycle` | One dossier per tender, keyed by TED's procedure id (or the publication number when there is none), stream `tender-<hash of realm and id>`. Spotted once; amended per correction; the award noted once; dismissed once, by the caller of `dismiss_tender`. Its state holds status flags only |
+| `*_to_tenders` | `project_tenders` | One upsert per event into the `tenders` table, correct in any order: a correction that lands before its spot keeps its values, an older one changes nothing, status flags are ORed |
+| `get_tenders_page`, `get_tender_by_id`, their responders | `query_tenders` | The morning list, best first (most keywords hit, then newest), without dismissed tenders unless asked, also as `text` to read (`get_tenders_page_text`); the whole dossier by id. The TED link is rebuilt from the publication number alone |
+| `tender_intake` | `guide_tender_lifecycle` | The day's count of spotted tenders against `MCL_TENDERS_DAILY_CAP`, the drops past it, and when the last notice arrived. In memory |
 | `mcl_tenders_group_keys` | `mcl_tenders` | The group's distributor, macula's `macula_group_keys` for the org, serving `group_keys_v1`. Admits a node with the org's grant (interim, macula-services/mcl-om#48) and a live membership of the realm. Not started without `MCL_GROUP_ORG_KEY_ID` |
 
 ## Decided (Raf, 2026-11-01, on reading this model)

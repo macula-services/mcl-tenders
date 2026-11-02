@@ -4,7 +4,7 @@ Run:  python3 architecture/c4_diagrams.py
 
   c4-context.svg     Level 1: what mcl-tenders talks to, and the realm around it
   c4-containers.svg  Level 2: the apps of the umbrella, its stores, and how they talk
-  c4-components.svg  Level 3: the profile slice as built, its components and stores
+  c4-components.svg  Level 3: the profile, the sensor and the morning list as built
 
 The model comes before the code (macula-services/mcl-tenders#1): it is drawn
 from the Boundary and Design on that issue, and once the apps exist, from the
@@ -229,20 +229,20 @@ def containers():
 
 
 def components():
-    d = Diagram("c4-components.svg", "mcl-tenders components: the profile slice and the sensor", 1450, 1000)
+    d = Diagram("c4-components.svg", "mcl-tenders components: the profile, the sensor and the morning list", 1500, 1260)
     d.box("b-per", 50, 30, 300, 120, "Tenders role holder", "[Person or agent of the realm]",
-          ["Describes, reads or archives the", "realm's profile, by a sealed call"], person=True)
+          ["Describes, reads or archives the profile;", "lists, reads and dismisses tenders,", "through sealed calls"], person=True)
     d.box("b-mac", 400, 30, 300, 120, "macula link", "[library, on this node]",
           ["Refuses a call in the clear, and", "a caller without the tenders role,", "before any handler runs"])
     d.box("b-mac", 750, 30, 300, 120, "macula-realm", "[Macula infrastructure]",
           ["Mints the tenders role and", "anchors the realm's identity"])
-    d.bound(30, 190, 1390, 640, "mcl-tenders [one release]: the profile slice and the sensor", bottom=True)
+    d.bound(30, 190, 1440, 860, "mcl-tenders [one release]: the profile, the sensor and the morning list", bottom=True)
     d.box("b-cmp", 50, 230, 300, 150, "describe_ and archive_ responders", "[guide_tender_lifecycle]",
           ["describe checks every field; archive", "ends the realm's search, for good.", "Each records the caller as who",
            "described or archived it."], code=True)
     d.box("b-sys", 400, 230, 300, 150, "mcl_tenders_service", "[mcl_om service contract]",
-          ["Announces three procedures, sealed,", "for the tenders role only. At boot,", "initiates the realm's profile",
-           "once; after that, it is there."], code=True)
+          ["Announces its six procedures,", "sealed, for the tenders role only.", "At boot, initiates the realm's",
+           "profile once. /health: intake, quiet."], code=True)
     d.box("b-cmp", 750, 230, 300, 150, "get_tender_profile_responder", "[query_tenders]",
           ["Answers the realm's profile,", "or a reason. Never the profile", "of another realm."], code=True)
     d.box("b-cmp", 50, 430, 300, 150, "tender_profile_aggregate", "[guide_tender_lifecycle, CMD]",
@@ -252,12 +252,12 @@ def components():
           ["One projection per event, through", "tenders_read_model_store, which", "keeps no argument in a crash",
            "report or a log."], code=True)
     d.box("b-cmp", 750, 430, 300, 150, "get_tender_profile", "[query_tenders, QRY]",
-          ["find/1 by realm, through", "tenders_query_store. The sensor", "reads it here, in process."],
-          code=True)
+          ["find/1 by realm, through", "tenders_query_store. The sensor", "and the process manager read",
+           "it here, in process."], code=True)
     d.box("b-cmp", 50, 630, 300, 150, "mcl_tenders_store", "[ReckonDB, embedded]",
-          ["Every event of the profile, on", "this node's disk under /data"], code=True)
+          ["Every event of the profile and", "of each dossier, on this node's", "disk under /data"], code=True)
     d.box("b-cmp", 400, 630, 300, 150, "tenders.sqlite3", "[SQLite read model]",
-          ["The profile, one row per realm,", "shaped for get_tender_profile"], code=True)
+          ["The profile, one row per realm;", "the tenders, one row per dossier,", "indexed for the morning list"], code=True)
     d.box("b-ext", 1100, 30, 300, 120, "TED Search API", "[External system]",
           ["Anonymous, no key. Sees the", "realm's CPV codes and countries"])
     d.box("b-cmp", 1100, 430, 300, 150, "sense_ted_notices", "[sense_tender_notices, sensor]",
@@ -266,6 +266,18 @@ def components():
     d.box("b-cmp", 1100, 630, 300, 150, "mcl_tenders_group_keys", "[macula_group_keys, distributor]",
           ["Hands the tenders group's key", "to nodes with the org's grant.", "Not started without",
            "MCL_GROUP_ORG_KEY_ID."], code=True)
+    d.box("b-cmp", 50, 830, 300, 150, "tender_aggregate", "[guide_tender_lifecycle, CMD]",
+          ["spot, amend, note the award, dismiss:", "one dossier per tender, its state", "flags only. dismiss_tender_responder",
+           "records the caller."], code=True)
+    d.box("b-cmp", 400, 830, 300, 150, "*_to_tenders", "[project_tenders, PRJ]",
+          ["One upsert per event, in any order:", "a correction that lands before its", "spot is kept; status flags are ORed."],
+          code=True)
+    d.box("b-cmp", 750, 830, 300, 150, "get_tenders_page, get_tender_by_id", "[query_tenders, QRY, and responders]",
+          ["The morning list, best first, and", "the whole dossier. The TED link is", "rebuilt from the publication",
+           "number, never taken from a notice."], code=True)
+    d.box("b-cmp", 1100, 830, 300, 150, "on_tender_notice_reported_v1_*", "[guide_tender_lifecycle, PM]",
+          ["Reads each notice again, fits it", "(tender_fit: keywords only, #4a),", "caps the day's spots (tender_intake),",
+           "dispatches in process."], code=True)
     d.edge("M350 90H400"); d.text("t-rel", 375, 82, "call", anchor="middle")
     d.edge("M1100 505H1050"); d.text("t-rel", 1075, 497, "find/1", anchor="middle")
     d.edge("M1250 430V150"); d.text("t-rel", 1258, 290, "days, CPV codes,"); d.text("t-rel", 1258, 306, "countries")
@@ -280,11 +292,21 @@ def components():
     d.edge("M350 705H375V530H400"); d.text("t-rel", 368, 620, "events", anchor="end", rotate=-90)
     d.edge("M550 580V630"); d.text("t-rel", 558, 610, "writes")
     d.edge("M900 580V705H700"); d.text("t-rel", 908, 650, "reads")
-    d.text("t-desc", 50, 870, "The profile says what the realm bids for, so it lives on the node's disk, in the event store and the read model, and")
-    d.text("t-desc", 50, 888, "nowhere else: not in a log, not in a crash report, not in the aggregate's state. Every procedure is sealed and admits")
-    d.text("t-desc", 50, 906, "only identities the realm granted the tenders role. The sensor asks TED for the profile's codes and countries only, and its")
-    d.text("t-desc", 50, 924, "facts travel sealed under the realm's tenders group, to the dossier (#4) that comes next on this same release.")
-    d.legend(940)
+    d.edge("M1400 505H1440V905H1400")
+    d.text("t-rel", 1448, 705, "the sealed fact, from the mcl-tenders org", anchor="middle", rotate=90)
+    d.edge("M1150 830V805H1000V580"); d.text("t-rel", 1008, 800, "profile")
+    d.edge("M1250 980V1015H200V980"); d.text("t-rel", 725, 1009, "spot, amend, note the award, in process", anchor="middle")
+    d.edge("M200 830V780"); d.text("t-rel", 208, 810, "appends events")
+    d.edge("M350 760H375V905H400"); d.text("t-rel", 368, 870, "events", anchor="end", rotate=-90)
+    d.edge("M550 830V780"); d.text("t-rel", 558, 810, "writes")
+    d.edge("M750 905H725V760H700"); d.text("t-rel", 733, 800, "reads")
+    d.text("t-desc", 50, 1090, "The profile says what the realm bids for, so it lives on the node's disk, in the event store and the read model, and")
+    d.text("t-desc", 50, 1108, "nowhere else: not in a log, not in a crash report, not in an aggregate's state. Which notices fit draws the profile's")
+    d.text("t-desc", 50, 1126, "outline, so the dossiers keep the same rule. Every procedure is sealed and admits only identities the realm granted the")
+    d.text("t-desc", 50, 1144, "tenders role. The sensor asks TED for the profile's codes and countries only, and its facts travel sealed under the")
+    d.text("t-desc", 50, 1162, "realm's tenders group, to the process manager the node subscribes once the group is set up. The morning list also")
+    d.text("t-desc", 50, 1180, "answers as text, one line per tender, for an agent to read out.")
+    d.legend(1220)
     d.write()
 
 
