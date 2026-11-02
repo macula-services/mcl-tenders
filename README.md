@@ -498,6 +498,14 @@ and once that digest is signed and attested, `:latest` is pointed at the same
 digest (`scripts/promote_latest.sh`). A push that changes only documentation
 builds no image (`scripts/is_image_push.sh`).
 
+Rolling back is pinning an older digest, and the read model only moves
+forward: a release refuses a `tenders.sqlite3` newer than it knows
+(`schema_newer_than_release`). So a rollback across a schema change (0.4.0 to
+0.3.x, for one) also moves `tenders.sqlite3` out of `MCL_DATA_DIR`. The next
+boot rebuilds the read model from the event store, which keeps every event;
+what the older release does not know stays in the store, unread, until the
+node rolls forward. CHANGELOG names each release that changes the schema.
+
 The service's org, the `<org>` its procedure names carry, is this repository's
 name, fixed in `config/sys.config.src`. The realm's grant names it; without an
 org mcl_om refuses to boot.

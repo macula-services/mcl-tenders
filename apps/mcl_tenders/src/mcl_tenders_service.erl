@@ -56,7 +56,7 @@
 %% never a notice or a profile.
 info() ->
     #{name => <<"mcl-tenders">>,
-      version => <<"0.3.1">>,
+      version => <<"0.4.0">>,
       description => <<"Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node">>,
       sealing => sealing(tender_notices_group:missing()),
       reads => read_callers(os:getenv("MCL_TENDERS_OPEN_READS")),

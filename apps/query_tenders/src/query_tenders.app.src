@@ -1,6 +1,6 @@
 {application, query_tenders, [
     {description, "QRY: answers from the read model project_tenders writes, in process and through sealed procedures for the tenders role"},
-    {vsn, "0.3.1"},
+    {vsn, "0.4.0"},
     {registered, [query_tenders_sup, tenders_query_store]},
     {mod, {query_tenders_app, []}},
     {applications, [
