@@ -15,13 +15,19 @@
 %%% Every list is sorted and deduplicated, text after NFC, so one term
 %%% written two ways is kept once. `described_by' is the caller's node id,
 %%% kept so the realm can see who last changed what it bids for.
+%%%
+%%% `unless_described' (0 or 1, default 0): 1 asks the aggregate to describe
+%%% the profile only if it was never described, and refuse `already_described'
+%%% otherwise. The node's operator sets it when describing from config at boot
+%%% (describe_tender_profile_from_config), so a profile the realm described
+%%% over the mesh is never replaced by the box's config. A CALL never sets it.
 %%% @end
 -module(describe_tender_profile_v1).
 -behaviour(evoq_command).
 
 -export([command_type/0]).
 -export([new/1, from_map/1, validate/1, to_map/1]).
--export([stream_id/1, get_realm/1, fields/1]).
+-export([stream_id/1, get_realm/1, fields/1, unless_described/1]).
 
 -define(CPV, "^[0-9]{8}\\z").
 -define(COUNTRY, "^[A-Z]{3}\\z").
@@ -33,7 +39,8 @@
     countries :: [binary()],
     keywords :: [binary()],
     exclusions :: [binary()],
-    description :: binary()
+    description :: binary(),
+    unless_described = 0 :: 0 | 1
 }).
 
 -opaque t() :: #describe_tender_profile_v1{}.
@@ -45,7 +52,8 @@ command_type() -> describe_tender_profile_v1.
 %% @doc A command that exists is a valid one, its text already normalised.
 -spec new(map()) -> {ok, t()} | {error, atom()}.
 new(#{realm := <<_:256>> = Realm} = Params) ->
-    by_member(maps:get(described_by, Params, undefined), Realm, Params);
+    guarded(by_member(maps:get(described_by, Params, undefined), Realm, Params),
+            maps:get(unless_described, Params, 0));
 new(_) ->
     {error, invalid_realm}.
 
@@ -53,12 +61,13 @@ new(_) ->
 -spec from_map(map()) -> {ok, t()} | {error, term()}.
 from_map(#{realm := <<_:256>> = Realm, described_by := <<_:256>> = By, cpv_codes := Cpv,
            countries := Countries, keywords := Keywords, exclusions := Exclusions,
-           description := Description})
+           description := Description} = Map)
   when is_list(Cpv), is_list(Countries), is_list(Keywords), is_list(Exclusions),
        is_binary(Description) ->
-    {ok, #describe_tender_profile_v1{realm = Realm, described_by = By, cpv_codes = Cpv,
-                                     countries = Countries, keywords = Keywords,
-                                     exclusions = Exclusions, description = Description}};
+    guarded({ok, #describe_tender_profile_v1{realm = Realm, described_by = By, cpv_codes = Cpv,
+                                             countries = Countries, keywords = Keywords,
+                                             exclusions = Exclusions, description = Description}},
+            maps:get(unless_described, Map, 0));
 from_map(_) ->
     {error, invalid_tender_profile_description}.
 
@@ -66,9 +75,15 @@ from_map(_) ->
 validate(#describe_tender_profile_v1{}) -> ok.
 
 -spec to_map(t()) -> map().
-to_map(#describe_tender_profile_v1{realm = Realm, described_by = By} = Cmd) ->
-    maps:merge(#{command_type => describe_tender_profile_v1, realm => Realm, described_by => By},
+to_map(#describe_tender_profile_v1{realm = Realm, described_by = By,
+                                   unless_described = Unless} = Cmd) ->
+    maps:merge(#{command_type => describe_tender_profile_v1, realm => Realm, described_by => By,
+                 unless_described => Unless},
                fields(Cmd)).
+
+%% @doc 1 when the command describes the profile only if it was never described.
+-spec unless_described(t()) -> 0 | 1.
+unless_described(#describe_tender_profile_v1{unless_described = V}) -> V.
 
 -spec stream_id(t()) -> binary().
 stream_id(#describe_tender_profile_v1{realm = Realm}) ->
@@ -87,6 +102,13 @@ fields(#describe_tender_profile_v1{cpv_codes = Cpv, countries = Countries, keywo
 %%--------------------------------------------------------------------
 %% Checking the fields
 %%--------------------------------------------------------------------
+
+guarded({ok, Cmd}, Unless) when Unless =:= 0; Unless =:= 1 ->
+    {ok, Cmd#describe_tender_profile_v1{unless_described = Unless}};
+guarded({ok, _Cmd}, _NotZeroOrOne) ->
+    {error, invalid_unless_described};
+guarded({error, _} = Refused, _Unless) ->
+    Refused.
 
 by_member(<<_:256>> = By, Realm, Params) ->
     built(Realm, By, [{Field, Refusal, Check(maps:get(Field, Params, Default))}

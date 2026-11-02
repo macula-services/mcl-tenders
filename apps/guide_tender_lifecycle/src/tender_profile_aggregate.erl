@@ -50,7 +50,10 @@ do_execute(initiate_tender_profile_v1, Status, Payload) ->
     initiate(evoq_bit_flags:has(Status, ?TENDER_PROFILE_INITIATED), Payload);
 do_execute(describe_tender_profile_v1, Status, Payload) ->
     describe(evoq_bit_flags:has(Status, ?TENDER_PROFILE_INITIATED),
-             evoq_bit_flags:has(Status, ?TENDER_PROFILE_ARCHIVED), Payload);
+             evoq_bit_flags:has(Status, ?TENDER_PROFILE_ARCHIVED),
+             once_only(maps:get(unless_described, Payload, 0),
+                       evoq_bit_flags:has(Status, ?TENDER_PROFILE_DESCRIBED)),
+             Payload);
 do_execute(archive_tender_profile_v1, Status, Payload) ->
     archive(evoq_bit_flags:has(Status, ?TENDER_PROFILE_INITIATED),
             evoq_bit_flags:has(Status, ?TENDER_PROFILE_ARCHIVED), Payload);
@@ -60,9 +63,15 @@ do_execute(_Unknown, _Status, _Payload) ->
 initiate(true, _Payload) -> {error, already_initiated};
 initiate(false, Payload) -> maybe_initiate_tender_profile:handle_from_map(Payload).
 
-describe(false, _Archived, _Payload) -> {error, not_initiated};
-describe(true, true, _Payload) -> {error, archived};
-describe(true, false, Payload) -> maybe_describe_tender_profile:handle_from_map(Payload).
+%% A describe that asks for `unless_described' finds the profile described
+%% already: refused, so the description the realm gave is kept.
+once_only(1, true) -> already_described;
+once_only(_Unless, _Described) -> free.
+
+describe(false, _Archived, _Once, _Payload) -> {error, not_initiated};
+describe(true, true, _Once, _Payload) -> {error, archived};
+describe(true, false, already_described, _Payload) -> {error, already_described};
+describe(true, false, free, Payload) -> maybe_describe_tender_profile:handle_from_map(Payload).
 
 archive(false, _Archived, _Payload) -> {error, not_initiated};
 archive(true, true, _Payload) -> {error, already_archived};

@@ -5,7 +5,31 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.1] - 2026-11-02
+
+Refs macula-services/mcl-tenders#20.
+
+- **Open reads, a switch, off by default.** `MCL_TENDERS_OPEN_READS=1` opens
+  `get_tenders_page` and `get_tender_by_id` to every member of the realm
+  (`{callers, members}`), so an agent the realm admitted can ask "any tenders
+  today?" with no role. Sealing stays required; a node of another realm is
+  still refused. The profile, `dismiss_tender` and `archive_tender_profile`
+  stay with the tenders role. `/health` info names it: `reads` is `role` or
+  `members`.
+- **The node can describe the realm's profile from its config, at boot.**
+  `MCL_TENDERS_PROFILE_CPV` and `MCL_TENDERS_PROFILE_COUNTRIES`
+  (comma-separated; countries alpha-3) describe it through
+  `maybe_describe_tender_profile:dispatch`, the same command, rules and event
+  as the CALL, by the node's own id, and only when the profile was never
+  described: `describe_tender_profile_v1` gains `unless_described`, and the
+  aggregate refuses `already_described` on a described profile, so one the
+  realm described over the mesh is kept. A bad value is logged by its reason
+  and never stops the boot. With open reads, the demo path needs no role and
+  no realm admin.
+
+## [0.3.0] - 2026-11-02
+
+Refs macula-services/mcl-tenders#4, #11, #15 and #18.
 
 - **The group grant mints on the real realm box.** The realm runs there as a
   release in a container, with no checkout and no `mix`, so
@@ -15,13 +39,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   nothing on the realm: it loads the `mcl-tenders` org key file itself and
   refuses when the file is missing or does not load, leaving it as it is. It
   never calls the realm's `OrgKeys`, which would make and save a new key in
-  either case and replace the realm's org key. The grant names the realm the box serves, so the realm name
-  argument is gone. Scripts and README only; the image is unchanged.
-
-## [0.3.0] - 2026-11-02
-
-Refs macula-services/mcl-tenders#4, #11 and #15.
-
+  either case and replace the realm's org key. The grant names the realm the
+  box serves, so the realm name argument is gone. Scripts and README only.
 - **The morning list** (#4, first step). Each reported contract notice or
   prior information notice that fits the realm's profile gets a dossier
   (`tender_aggregate`, `spot_tender`); corrections (`amend_tender`) and the

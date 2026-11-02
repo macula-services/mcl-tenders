@@ -10,6 +10,13 @@
 
 initiate() -> #{command_type => initiate_tender_profile_v1, realm => ?REALM}.
 
+describe_unless_described() ->
+    {ok, Cmd} = describe_tender_profile_v1:new(#{realm => ?REALM, described_by => ?MEMBER,
+                                                 cpv_codes => [<<"72000000">>],
+                                                 countries => [<<"BEL">>],
+                                                 unless_described => 1}),
+    describe_tender_profile_v1:to_map(Cmd).
+
 describe() ->
     {ok, Cmd} = describe_tender_profile_v1:new(#{realm => ?REALM, described_by => ?MEMBER,
                                                  cpv_codes => [<<"72000000">>],
@@ -58,6 +65,19 @@ describing_an_initiated_profile_records_every_field_test() ->
     ?assertEqual(1 bor 2, tender_profile_state:status(S2)),
     %% Described again, as often as the realm likes: each replaces the last.
     ?assertMatch({ok, _}, step(S2, describe())).
+
+%% `unless_described' (the node's config, at boot): it describes a profile
+%% never described, and is refused on one described already, so the realm's
+%% own description is kept. Without it, describing again replaces as before.
+describing_unless_described_applies_only_to_an_undescribed_profile_test() ->
+    {ok, S} = step(fresh(), initiate()),
+    {ok, S2} = step(S, describe_unless_described()),
+    ?assertEqual(1 bor 2, tender_profile_state:status(S2)),
+    ?assertEqual({error, already_described}, step(S2, describe_unless_described())),
+    ?assertMatch({ok, _}, step(S2, describe())),
+    {ok, S3} = step(S, describe()),
+    ?assertEqual({error, already_described}, step(S3, describe_unless_described())),
+    ?assertEqual({error, not_initiated}, step(fresh(), describe_unless_described())).
 
 %% T8: the state evoq keeps in memory, and puts in a crash report, carries no
 %% profile term. The rules need only the flags.

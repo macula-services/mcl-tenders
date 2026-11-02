@@ -14,6 +14,11 @@
 %%%   - a role grant for the other procedure: refused;
 %%%   - anything from another realm, signed by its key: refused.
 %%%
+%%% With MCL_TENDERS_OPEN_READS=1 the two reads (get_tenders_page,
+%%% get_tender_by_id) declare `{callers, members}' instead: a bare member of
+%%% this realm is admitted to them, nothing of another realm is, and every
+%%% other procedure keeps the role. Both ways are held below.
+%%%
 %%% The clear call is refused by the link because the advertisement is
 %%% `required'; this suite holds the options mcl_om hands macula to that, and
 %%% holds mcl_om's boot check, which refuses `required' without kem_advertise.
@@ -58,11 +63,46 @@ per_procedure(Name, Other, #{realm_key := RealmKey, other_realm_key := OtherKey,
      {binary_to_list(Name), ?_assertMatch({error, _}, verdict(Role, Gate, Procedure, <<16#ee:256>>))}].
 
 %% Every capability asks macula for exactly the gate and the seal above, in the
-%% options mcl_om builds for macula:advertise/5.
-every_procedure_is_advertised_role_gated_and_sealed_test() ->
-    [?assertEqual({Name, #{auth => {callers, role}}, #{confidential => required}},
-                  {Name, mcl_om_capabilities:auth_opts(Cap), mcl_om_capabilities:confidentiality_opts(Cap)})
-     || #{name := Name} = Cap <- mcl_tenders_service:capabilities()].
+%% options mcl_om builds for macula:advertise/5: with the open reads switch
+%% unset, and with any value that is not exactly "1".
+every_procedure_is_advertised_role_gated_and_sealed_test_() ->
+    [{label(Value), ?_assertEqual([{Name, #{auth => {callers, role}}, #{confidential => required}}
+                            || Name <- procedure_names()],
+                           advertised(Value))}
+     || Value <- [false, "", "0", "true", "yes", " 1", "1 "]].
+
+%% THE OPEN READS SWITCH, ON: the morning list and one tender admit every
+%% member of the realm, still sealed; the profile, dismissing and archiving
+%% stay with the role.
+with_open_reads_only_the_two_reads_admit_members_test() ->
+    Expected = [{Name, #{auth => {callers, open_reads_class(Name)}}, #{confidential => required}}
+                || Name <- procedure_names()],
+    ?assertEqual(Expected, advertised("1")),
+    ?assertEqual([<<"get_tenders_page">>, <<"get_tender_by_id">>],
+                 [N || {N, #{auth := {callers, members}}, _} <- Expected]).
+
+%% What the members class admits, on macula's own verifier: a bare member of
+%% this realm, for the two reads; never a token another realm's key signed;
+%% never the same token presented by another node. macula resolves `members'
+%% to `{realm_member_required, RealmKeyId, any}' (macula_client:caller_policy/3).
+open_reads_test_() ->
+    {setup, fun parties/0,
+     fun(#{realm_key := RealmKey, other_realm_key := OtherKey, holder_id := Caller}) ->
+         Gate = {realm_member_required, macula_node_keys:key_id(RealmKey), any},
+         Member = mint(RealmKey, Caller, <<"mri:realm:", ?REALM_NAME/binary>>, <<"member/device">>),
+         ForeignMember = mint(OtherKey, Caller, <<"mri:realm:", ?REALM_NAME/binary>>, <<"member/device">>),
+         lists:append(
+           [[{binary_to_list(Name), ?_assertMatch({ok, _}, verdict(Member, Gate, Procedure, Caller))},
+             {binary_to_list(Name), ?_assertMatch({error, _}, verdict(ForeignMember, Gate, Procedure, Caller))},
+             {binary_to_list(Name), ?_assertMatch({error, _}, verdict(Member, Gate, Procedure, <<16#ee:256>>))}]
+            || Name <- [<<"get_tenders_page">>, <<"get_tender_by_id">>],
+               Procedure <- [mcl_om_capabilities:org_procedure(?ORG, Name)]])
+     end}.
+
+%% `info' names the switch's state for /health.
+info_names_who_may_read_test_() ->
+    [{label(Value), ?_assertMatch(#{reads := Class}, with_env(Value, fun mcl_tenders_service:info/0))}
+     || {Value, Class} <- [{false, role}, {"0", role}, {"1", members}]].
 
 %% `required' with the KEM key named boots; without it mcl_om refuses to boot
 %% rather than serve the profile in the clear.
@@ -75,6 +115,30 @@ a_sealed_procedure_without_the_kem_key_does_not_boot_test() ->
 %%--------------------------------------------------------------------
 %% Fixtures
 %%--------------------------------------------------------------------
+
+-define(SWITCH, "MCL_TENDERS_OPEN_READS").
+
+procedure_names() ->
+    [N || #{name := N} <- with_env(false, fun mcl_tenders_service:capabilities/0)].
+
+open_reads_class(<<"get_tenders_page">>) -> members;
+open_reads_class(<<"get_tender_by_id">>) -> members;
+open_reads_class(_) -> role.
+
+advertised(Value) ->
+    [{Name, mcl_om_capabilities:auth_opts(Cap), mcl_om_capabilities:confidentiality_opts(Cap)}
+     || #{name := Name} = Cap <- with_env(Value, fun mcl_tenders_service:capabilities/0)].
+
+%% Runs F with the switch set to Value (false: unset), and puts it back.
+with_env(Value, F) ->
+    Before = os:getenv(?SWITCH),
+    set_switch(Value),
+    try F() after set_switch(Before) end.
+
+label(Value) -> lists:flatten(io_lib:format("MCL_TENDERS_OPEN_READS=~p", [Value])).
+
+set_switch(false) -> os:unsetenv(?SWITCH);
+set_switch(Value) -> os:putenv(?SWITCH, Value).
 
 parties() ->
     {ok, RealmKey} = macula_node_keys:generate(realm, ?PROFILE, #{}),
