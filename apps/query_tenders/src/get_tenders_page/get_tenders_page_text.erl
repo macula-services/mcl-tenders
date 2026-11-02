@@ -1,5 +1,6 @@
 %% @doc The morning list as a person reads it: one line per tender, best
-%% first, with its title, buyer, country, deadline and TED notice id.
+%% first, with its title, buyer, country, deadline and TED notice id, and
+%% where the bid team took it, once it pursues it.
 %%
 %% An agent that asks "any tenders today?" over the mesh answers with this
 %% text as it stands, so it carries nothing the summary does not: no link
@@ -14,6 +15,13 @@
 %% TED's language code for English, the title shown when the notice has one.
 -define(ENGLISH, <<"ENG">>).
 
+%% tender_state's pursuit flags (tender_status.hrl; a test pins them).
+-define(PURSUED, 16).
+-define(DECLINED, 32).
+-define(BID_SUBMITTED, 64).
+-define(WON, 128).
+-define(LOST, 256).
+
 %% @doc The page's summaries as text.
 -spec rendered([map()]) -> binary().
 rendered([]) ->
@@ -27,11 +35,19 @@ counted(1) -> <<"1 tender">>;
 counted(N) -> [integer_to_binary(N), " tenders"].
 
 line(N, #{titles := Titles, buyer_name := Buyer, buyer_country := Country,
-          deadline_at := Deadline, publication_number := Number}) ->
+          deadline_at := Deadline, publication_number := Number, status := Status}) ->
     [integer_to_binary(N), ". ", one_line(title(Titles)),
      " | buyer: ", one_line(or_unknown(Buyer)), " (", or_unknown(Country), ")",
      " | deadline: ", deadline(Deadline),
-     " | notice: ", Number].
+     " | notice: ", Number, pursuit(Status)].
+
+%% Where the pursuit stands, the furthest step first; nothing before one.
+pursuit(Status) when Status band ?WON =/= 0 -> <<" | pursuit: won">>;
+pursuit(Status) when Status band ?LOST =/= 0 -> <<" | pursuit: lost">>;
+pursuit(Status) when Status band ?DECLINED =/= 0 -> <<" | pursuit: declined">>;
+pursuit(Status) when Status band ?BID_SUBMITTED =/= 0 -> <<" | pursuit: bid submitted">>;
+pursuit(Status) when Status band ?PURSUED =/= 0 -> <<" | pursuit: pursuing">>;
+pursuit(_Status) -> <<>>.
 
 %% English when the notice has it, else the first language it gives.
 title(Titles) ->

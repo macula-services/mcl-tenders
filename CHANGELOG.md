@@ -5,6 +5,23 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Refs macula-services/mcl-tenders#4 (4b).
+
+- **The pursuit: from bid/no-bid to won or lost.** Four sealed procedures for
+  the tenders role on a spotted tender's dossier: `pursue_tender`,
+  `decline_tender`, `submit_tender_bid` and `record_tender_outcome`
+  (`won` or `lost`). Each step happens once, in order, and records the node
+  that signed the call (T13). A pursued tender is no longer dismissed
+  (`pursued`) and a dismissed one is not pursued (`dismissed`). Corrections
+  and the award keep folding into a pursued dossier. The open reads switch
+  never opens the pursuit.
+- `get_tender_by_id` answers the pursuit (`pursued_by`, `declined_by`,
+  `submitted_by`, `outcome`, `outcome_by` and their times), and each line of
+  `get_tenders_page`'s `text` ends with where the pursuit stands. The read
+  model moves forward in place (user_version 3).
+
 ## [0.3.1] - 2026-11-02
 
 Refs macula-services/mcl-tenders#20.

@@ -16,6 +16,8 @@
 
 -define(MEMBER, <<16#a1:256>>).
 -define(TENDER, <<"85e562c1-17d1-4192-a543-082edb9b62ab">>).
+-define(DECLINED, <<"wire-declined-1">>).
+-define(DISMISSED, <<"wire-dismissed-1">>).
 -define(PROFILE, [<<"cpv_codes">>, <<"countries">>, <<"described_at">>, <<"described_by">>,
                   <<"description">>, <<"exclusions">>, <<"keywords">>]).
 -define(DOSSIER, [<<"tender_id">>, <<"publication_number">>, <<"procedure_id">>, <<"notice_type">>,
@@ -24,7 +26,10 @@
                   <<"estimated_value">>, <<"currency">>, <<"published_at">>, <<"status">>,
                   <<"matched_cpv_codes">>, <<"matched_keywords">>, <<"spotted_at">>,
                   <<"corrected_by">>, <<"amended_at">>, <<"award_publication_number">>,
-                  <<"award_published_at">>, <<"dismissed_by">>, <<"dismissed_at">>, <<"ted_url">>]).
+                  <<"award_published_at">>, <<"dismissed_by">>, <<"dismissed_at">>,
+                  <<"pursued_by">>, <<"pursued_at">>, <<"declined_by">>, <<"declined_at">>,
+                  <<"submitted_by">>, <<"submitted_at">>, <<"outcome">>, <<"outcome_by">>,
+                  <<"outcome_at">>, <<"ted_url">>]).
 
 %% THE TABLE. Per procedure: the keys every success reply carries, and the keys
 %% it may carry.
@@ -34,7 +39,11 @@ replies() ->
      {<<"archive_tender_profile">>,  {[], []}},
      {<<"get_tenders_page">>,        {[<<"tenders">>, <<"text">>], []}},
      {<<"get_tender_by_id">>,        {?DOSSIER, []}},
-     {<<"dismiss_tender">>,          {[], []}}].
+     {<<"dismiss_tender">>,          {[], []}},
+     {<<"pursue_tender">>,           {[], []}},
+     {<<"decline_tender">>,          {[], []}},
+     {<<"submit_tender_bid">>,       {[], []}},
+     {<<"record_tender_outcome">>,   {[], []}}].
 
 %% One entry of the morning list, and the whole dossier.
 summary_keys() ->
@@ -65,6 +74,11 @@ every_refusal_and_every_success_conforms() ->
                 call(<<"get_tenders_page">>, #{limit => 0}, ?MEMBER),
                 call(<<"get_tender_by_id">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
                 call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"pursue_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"decline_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"submit_tender_bid">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"record_tender_outcome">>, #{tender_id => {text, ?TENDER},
+                                                   outcome => {text, <<"won">>}}, ?MEMBER),
                 call(<<"archive_tender_profile">>, #{}, ?MEMBER)],
     [?assertMatch({_, [<<"reason">>], {text, _}},
                   {Name, maps:keys(Reply), maps:get(<<"reason">>, Reply)})
@@ -79,6 +93,10 @@ every_refusal_and_every_success_conforms() ->
                         absent) end,
       [{text, <<"BEL">>}, {text, <<"NLD">>}]),
     {spot_tender, ok} = mcl_tenders_pipeline:reported(tender_notice_fixture:fact()),
+    %% Two more tenders: one the bid team declines, one it dismisses, since a
+    %% pursued tender is no longer dismissed and a submitted one not declined.
+    [{spot_tender, ok} = mcl_tenders_pipeline:reported(tender_notice_fixture:fact(#{procedure_id => Id}))
+     || Id <- [?DECLINED, ?DISMISSED]],
     mcl_tenders_pipeline:eventually(
       fun() -> maps:is_key(<<"reason">>, element(2, call(<<"get_tender_by_id">>,
                                                          #{tender_id => {text, ?TENDER}}, ?MEMBER)))
@@ -88,7 +106,13 @@ every_refusal_and_every_success_conforms() ->
     ?assertEqual(summary_keys(), lists:sort(maps:keys(Entry))),
     Successes = [Described, call(<<"get_tender_profile">>, #{}, ?MEMBER), Listed,
                  call(<<"get_tender_by_id">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
-                 call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                 call(<<"dismiss_tender">>, #{tender_id => {text, ?DISMISSED}}, ?MEMBER),
+                 call(<<"pursue_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                 call(<<"submit_tender_bid">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                 call(<<"record_tender_outcome">>, #{tender_id => {text, ?TENDER},
+                                                    outcome => {text, <<"lost">>}}, ?MEMBER),
+                 call(<<"pursue_tender">>, #{tender_id => {text, ?DECLINED}}, ?MEMBER),
+                 call(<<"decline_tender">>, #{tender_id => {text, ?DECLINED}}, ?MEMBER),
                  %% Last, because archived is terminal.
                  call(<<"archive_tender_profile">>, #{}, ?MEMBER)],
     [?assertEqual({Name, conforms}, {Name, conforms(Name, Reply)}) || {Name, Reply} <- Successes],
