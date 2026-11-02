@@ -74,7 +74,8 @@ key and macula's link refuses a call in the clear, so the profile and the
 tenders cross a station only as ciphertext. Each admits **only the tenders role**
 (`auth => {callers, role}`): an identity holding a capability the realm minted
 for that procedure. A bare realm member, or a node of another realm, is refused
-by the link before any handler runs. Each replies with its answer, or
+by the link before any handler runs (but see "Open reads" below for the two
+reads). Each replies with its answer, or
 `{"reason": "<text>"}` naming the rule that refused it. Those reason strings are
 the wire contract.
 
@@ -86,6 +87,19 @@ the wire contract.
 | `mcl-tenders/get_tenders_page` | `{"since"?, "limit"?, "include_dismissed"?}` | `{tenders: [...], text}`: the morning list, best first, and `text`, the same list as lines to read (title, buyer, country, deadline, notice id) |
 | `mcl-tenders/get_tender_by_id` | `{"tender_id"}` | `{tender_id, publication_number, procedure_id, notice_type, buyer_name, buyer_country, cpv_codes, titles, description, description_lang, deadline_at, estimated_value, currency, published_at, status, matched_cpv_codes, matched_keywords, spotted_at, corrected_by, amended_at, award_publication_number, award_published_at, dismissed_by, dismissed_at, ted_url}` |
 | `mcl-tenders/dismiss_tender` | `{"tender_id"}` | `{}`: the tender leaves the morning list; the caller is recorded |
+
+### Open reads
+
+`MCL_TENDERS_OPEN_READS=1` in the node's environment opens the two reads,
+`get_tenders_page` and `get_tender_by_id`, to **every member of the realm**
+(`auth => {callers, members}`): an identity the realm admitted, with no role.
+They show the realm's tenders, built from public TED notices, including who
+dismissed one. A node of another realm is still refused, and the calls must
+still be sealed. The profile (`describe_tender_profile`, `get_tender_profile`:
+what the realm looks for), `dismiss_tender` and `archive_tender_profile` stay
+with the tenders role whatever the switch says. Any other value, or none,
+keeps the reads with the role. `/health` info says which: `reads` is `role`
+or `members`. To close them again, remove the line and redeploy.
 
 `described_by` is the 64-hex node id of the caller that described it last,
 `described_at` milliseconds since the epoch. The lists come back sorted, without
@@ -197,6 +211,10 @@ The answer is `get_tenders_page`'s `text`: one line per tender, best first,
 with its title, buyer, country, deadline and TED notice id. Getting there
 takes three parties, each doing what only it can do. Every step says what
 success looks like; stop at the first that does not show it.
+
+With open reads on (see "Open reads"), the agent needs no role: skip steps 2
+and 4, keep step 3 (the agent is a member of its own), and step 7, which
+describes the profile, stays with the role. Steps 5, 6 and 8 are the same.
 
 **On the realm, by a realm admin (once).**
 

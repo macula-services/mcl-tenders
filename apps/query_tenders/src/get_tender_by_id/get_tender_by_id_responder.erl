@@ -3,7 +3,9 @@
 %%% One spotted tender of the realm this node serves, for a caller the realm
 %%% granted the tenders role: the capability declares `{callers, role}' and the
 %%% call must be sealed (T2), and macula's link refuses everyone else before
-%%% the handler runs.
+%%% the handler runs. With MCL_TENDERS_OPEN_READS=1 it declares
+%%% `{callers, members}' instead: every member of the realm, still sealed
+%%% (mcl_tenders_service, "the open reads switch").
 %%%
 %%% Payload: `tender_id' (text). Replies the tender's dossier, or
 %%% `#{reason => Why}' (README, "Procedures").

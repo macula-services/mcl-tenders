@@ -44,6 +44,10 @@
 %% boot waits on the realm for the org key, which is a setup state, not a
 %% fault. The variables it waits on are named in the log, never their values.
 %%
+%% `reads' is who may call the two reads of the morning list: `role' (the
+%% tenders role, the default) or `members' (every member of the realm, the
+%% open reads switch), so an operator sees the switch without reading env.
+%%
 %% `intake' is today's count of spotted tenders, the drops past the day's cap
 %% and the cap itself (T12); `sensor' is whether the sensor sweeps or idles,
 %% the idle reason as a tag only, and when it last finished a whole sweep;
@@ -52,9 +56,10 @@
 %% never a notice or a profile.
 info() ->
     #{name => <<"mcl-tenders">>,
-      version => <<"0.3.0">>,
+      version => <<"0.3.1">>,
       description => <<"Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node">>,
       sealing => sealing(tender_notices_group:missing()),
+      reads => read_callers(os:getenv("MCL_TENDERS_OPEN_READS")),
       intake => intake(tender_intake:today()),
       sensor => sensor(sense_ted_notices:status()),
       quiet => quiet(sense_ted_notices:status(), erlang:system_time(millisecond))}.
@@ -139,11 +144,28 @@ health() -> ok.
 %% WHAT THIS SERVICE ANNOUNCES IT CAN DO. The profile's and the dossiers'
 %% procedures are CALLs answered by <name>_responder; README, "Procedures", is the contract. And,
 %% once the org key id is known, the tenders group's distributor.
+-define(READS, [<<"get_tenders_page">>, <<"get_tender_by_id">>]).
+
 capabilities() ->
-    [procedure(Name) || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>,
-                                 <<"archive_tender_profile">>, <<"get_tenders_page">>, <<"get_tender_by_id">>,
-                                 <<"dismiss_tender">>]]
+    ReadCallers = read_callers(os:getenv("MCL_TENDERS_OPEN_READS")),
+    [procedure(Name, callers(lists:member(Name, ?READS), ReadCallers))
+     || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>,
+                 <<"archive_tender_profile">>, <<"get_tenders_page">>, <<"get_tender_by_id">>,
+                 <<"dismiss_tender">>]]
         ++ group_keys(tender_notices_group:org_key_id()).
+
+%% THE OPEN READS SWITCH. `MCL_TENDERS_OPEN_READS=1' opens the two reads of
+%% the morning list, and only those, to every member of the realm: the list
+%% and one tender, built from public TED notices. Anything else, unset
+%% included, keeps them for the tenders role. The profile (what the realm
+%% looks for), dismissing a tender and archiving the profile stay with the
+%% role whatever the switch says, and every procedure stays sealed. A member
+%% is still an identity the realm admitted, never a node of another realm.
+read_callers("1") -> members;
+read_callers(_) -> role.
+
+callers(true, ReadCallers) -> ReadCallers;
+callers(false, _ReadCallers) -> role.
 
 %% macula's advertise_opts/0: `auth => handler_authorizes', which runs no gate
 %% at the link and hands the handler the call's token and proofs, and
@@ -158,11 +180,13 @@ group_keys(_OrgKeyId) ->
 %% THE GATE (T2). `{callers, role}': only an identity holding a capability the
 %% realm's tenders role minted for the procedure is admitted -- not a bare
 %% member, not a node of another realm -- and macula's link decides that
-%% before the handler runs. `confidential => required': the node names its KEM
+%% before the handler runs. `{callers, members}' (the two reads, with the
+%% switch on): any identity the realm admitted, still not a node of another
+%% realm. `confidential => required': the node names its KEM
 %% key (kem_advertise in sys.config) and the link refuses a call in the clear,
 %% so the profile crosses a station only as ciphertext.
-procedure(Name) ->
-    #{name => Name, version => 1, confidential => required, auth => {callers, role},
+procedure(Name, Callers) ->
+    #{name => Name, version => 1, confidential => required, auth => {callers, Callers},
       handler => {binary_to_atom(<<Name/binary, "_responder">>), []}}.
 
 %% THE AUTHORITY THIS SERVICE ASKS THE REALM FOR, and deliberately nothing more.

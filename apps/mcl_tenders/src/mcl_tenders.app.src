@@ -1,6 +1,6 @@
 {application, mcl_tenders, [
     {description, "Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node"},
-    {vsn, "0.3.0"},
+    {vsn, "0.3.1"},
     {registered, [mcl_tenders_sup, mcl_tenders_group_keys]},
     {mod, {mcl_tenders_app, []}},
     {applications, [

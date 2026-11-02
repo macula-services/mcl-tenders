@@ -1,6 +1,6 @@
 {application, guide_tender_lifecycle, [
     {description, "CMD: the process, from the realm's tenders profile to each tender it spots and pursues (tenderprofile-{digest} and tender-{digest} streams)"},
-    {vsn, "0.3.0"},
+    {vsn, "0.3.1"},
     {registered, []},
     {applications, [
         kernel,
