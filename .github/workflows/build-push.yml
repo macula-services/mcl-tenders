@@ -201,7 +201,7 @@ jobs:
   # AND NEVER BACKWARDS. The build's concurrency group is per ref, so two tags
   # build in parallel and finish in either order, and a patch to an older line
   # finishes last by design. So promotions run one at a time, repository-wide,
-  # and each moves :latest only if its tag is the newest v* by version order
+  # and each moves :latest only if its tag is the newest plain release
   # (scripts/is_newest_release.sh); an older one leaves :latest alone. GitHub
   # keeps one PENDING run per group, so a third promotion queued behind two
   # cancels the waiting one: at worst :latest stays on an older signed release
