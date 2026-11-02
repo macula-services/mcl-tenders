@@ -237,10 +237,15 @@ success looks like; stop at the first that does not show it.
        ssh <realm box> 'bash -s -- <node id>' < scripts/mint-tenders-group-ucan.sh \
          | ssh <node box> './set-tenders-group-env.sh'
 
-   Minting writes nothing on the realm. It uses the realm's `mcl-tenders` org
-   key (step 1) and refuses with `REFUSED: this realm holds no mcl-tenders
-   org key yet` if the realm has none, rather than make one that no org
-   directory names. The grant names the realm the box serves.
+   Minting writes nothing on the realm. It reads the realm's `mcl-tenders`
+   org key file itself (step 1) and never asks the realm's key store for it:
+   that store makes and saves a new key when the file is missing or does not
+   load, which would replace the realm's org key and leave every grant under
+   it verifying nowhere. It refuses instead, and leaves the file as it is:
+   `REFUSED: this realm holds no mcl-tenders org key yet`, or `REFUSED: the
+   realm's mcl-tenders org key does not load (<reason>)`. Either one is the
+   realm's to fix; do not mint around it. The grant names the realm the box
+   serves.
    *Success:* the last line reads `wrote ~/.macula/secrets/mcl-tenders.env
    (0600): MCL_GROUP_ORG_KEY_ID=<hex>, MCL_TENDERS_GROUP_UCAN (<n> characters)`.
    The grant is valid 30 days; mint again before then. An expired grant idles

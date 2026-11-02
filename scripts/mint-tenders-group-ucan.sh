@@ -18,11 +18,12 @@
 #                Public: the realm's Members page shows it.
 #   CONTAINER    (env) the realm's container, default macula-realm
 #
-# It WRITES NOTHING ON THE REALM. It uses the mcl-tenders org key only if the
-# realm already holds it (the realm makes it when it issues mcl-tenders'
-# provider grant) and refuses otherwise: asking the realm for an org key it
-# does not hold would make a new one and save it, and a grant signed by a key
-# no org directory names verifies nowhere.
+# It WRITES NOTHING ON THE REALM. It reads the realm's mcl-tenders org key file
+# itself (the realm makes it when it issues mcl-tenders' provider grant) and
+# refuses when that file is missing or does not load. It never asks the
+# realm's OrgKeys for the key: that call makes and saves a new key whenever the
+# file is missing OR fails to load, which would silently replace the realm's
+# org key and leave every grant under it verifying nowhere.
 #
 # The grant names the realm the box serves, is the org key's `group_keys'
 # capability on mri:proc:<realm>/mcl-tenders/group_keys_v1, for that node
@@ -49,17 +50,23 @@ read -r -d '' PROGRAM <<ELIXIR || true
 org = "mcl-tenders"
 node_id = Base.decode16!("${NODE_ID}", case: :mixed)
 key_file = Path.join(Application.fetch_env!(:macula_realm, :org_keys_path), org <> ".pq.bin")
+refuse = fn why -> IO.puts("REFUSED: " <> why) end
+mint = fn org_key ->
+  realm = MaculaRealm.Mesh.realm_name()
+  exp = :erlang.system_time(:second) + 86_400 * 30
+  caps = [%{with: "mri:proc:#{realm}/#{org}/group_keys_v1", can: "group_keys"}]
+  token = :macula_ucan.create(org_key, node_id, caps, %{exp: exp})
+  IO.puts("MCL_GROUP_ORG_KEY_ID=" <> Base.encode16(:macula_node_keys.key_id(org_key), case: :lower))
+  IO.puts("MCL_TENDERS_GROUP_UCAN=#{token}")
+end
 cond do
   not File.exists?(key_file) ->
-    IO.puts("REFUSED: this realm holds no mcl-tenders org key yet; it makes one when it issues mcl-tenders' provider grant (README, step 1)")
+    refuse.("this realm holds no mcl-tenders org key yet; it makes one when it issues mcl-tenders' provider grant (README, step 1)")
   true ->
-    realm = MaculaRealm.Mesh.realm_name()
-    org_key = MaculaRealm.Identity.OrgKeys.key(org)
-    exp = :erlang.system_time(:second) + 86_400 * 30
-    caps = [%{with: "mri:proc:#{realm}/#{org}/group_keys_v1", can: "group_keys"}]
-    token = :macula_ucan.create(org_key, node_id, caps, %{exp: exp})
-    IO.puts("MCL_GROUP_ORG_KEY_ID=" <> Base.encode16(MaculaRealm.Identity.OrgKeys.key_id(org), case: :lower))
-    IO.puts("MCL_TENDERS_GROUP_UCAN=#{token}")
+    case :macula_node_keys.load(key_file, :org, MaculaRealm.Identity.profile()) do
+      {:ok, org_key} -> mint.(org_key)
+      {:error, reason} -> refuse.("the realm's mcl-tenders org key does not load (#{inspect(reason)}); left as it is, nothing minted")
+    end
 end
 ELIXIR
 

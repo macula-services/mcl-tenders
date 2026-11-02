@@ -12,8 +12,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `scripts/mint-tenders-group-ucan.sh` now runs its program inside the
   realm's node through the release's rpc (`CONTAINER`, default
   `macula-realm`), as macula-realm's own operator scripts do. It writes
-  nothing on the realm: with no `mcl-tenders` org key it refuses instead of
-  making one. The grant names the realm the box serves, so the realm name
+  nothing on the realm: it loads the `mcl-tenders` org key file itself and
+  refuses when the file is missing or does not load, leaving it as it is. It
+  never calls the realm's `OrgKeys`, which would make and save a new key in
+  either case and replace the realm's org key. The grant names the realm the box serves, so the realm name
   argument is gone. Scripts and README only; the image is unchanged.
 
 ## [0.3.0] - 2026-11-02
