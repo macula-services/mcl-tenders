@@ -7,7 +7,16 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-Refs macula-services/mcl-tenders#4 (4b).
+Refs macula-services/mcl-tenders#25 and #4 (4b).
+
+- **A pursuit's documents and questions.** Two sealed procedures for the
+  tenders role on a pursued tender: `attach_tender_document` (name, SHA-256,
+  and where the file lies on the node; the file never travels) and
+  `record_tender_question`. Each records the node that signed the call (T13).
+  `get_tender_pursuit`, role-only whatever the open reads switch says, reads
+  them back; `get_tender_by_id` is unchanged. The read model moves forward in
+  place (user_version 4: `tender_documents`, `tender_questions`). No document
+  name, place or question reaches a log (T8).
 
 - **The pursuit: from bid/no-bid to won or lost.** Four sealed procedures for
   the tenders role on a spotted tender's dossier: `pursue_tender`,

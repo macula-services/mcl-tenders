@@ -25,7 +25,7 @@
 %% ⚠ A WRITE CARRIES THE PROFILE, AND NO LOG MAY (T8). The write's arguments
 %% are the realm's CPV codes, countries, keywords, exclusions and description,
 %% or a spotted tender and the keywords it hit, which draw the profile's
-%% outline (A2).
+%% outline (A2), or a pursuit's document names, places and questions (#25).
 %% So three things keep them out of every report:
 %%
 %%   - a raise while serving a request is answered, not exited on: the exit
@@ -118,7 +118,28 @@ migrations() ->
           "ALTER TABLE tenders ADD COLUMN submitted_at INTEGER NOT NULL DEFAULT 0",
           "ALTER TABLE tenders ADD COLUMN outcome TEXT NOT NULL DEFAULT ''",
           "ALTER TABLE tenders ADD COLUMN outcome_by TEXT NOT NULL DEFAULT ''",
-          "ALTER TABLE tenders ADD COLUMN outcome_at INTEGER NOT NULL DEFAULT 0"]}].
+          "ALTER TABLE tenders ADD COLUMN outcome_at INTEGER NOT NULL DEFAULT 0"]},
+     %% The pursuit's documents and the buyer's questions (#25): rows of their
+     %% own, many per tender. A document is keyed by its SHA-256 and a question
+     %% by the SHA-256 of its text, both lowercase hex. The file a document
+     %% names stays where `location' says, on the node.
+     {4, ["CREATE TABLE IF NOT EXISTS tender_documents ("
+          " realm        TEXT NOT NULL,"
+          " tender_id    TEXT NOT NULL,"
+          " sha256       TEXT NOT NULL,"
+          " name         TEXT NOT NULL DEFAULT '',"
+          " location     TEXT NOT NULL DEFAULT '',"
+          " attached_by  TEXT NOT NULL DEFAULT '',"
+          " attached_at  INTEGER NOT NULL DEFAULT 0,"
+          " PRIMARY KEY (realm, tender_id, sha256))",
+          "CREATE TABLE IF NOT EXISTS tender_questions ("
+          " realm        TEXT NOT NULL,"
+          " tender_id    TEXT NOT NULL,"
+          " question_id  TEXT NOT NULL,"
+          " question     TEXT NOT NULL DEFAULT '',"
+          " recorded_by  TEXT NOT NULL DEFAULT '',"
+          " recorded_at  INTEGER NOT NULL DEFAULT 0,"
+          " PRIMARY KEY (realm, tender_id, question_id))"]}].
 
 -spec start_link(string()) -> {ok, pid()} | {error, term()}.
 start_link(SqlitePath) ->

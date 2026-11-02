@@ -50,9 +50,9 @@ nothing more is recorded on it.
 
 | Division | Desks | Dossier or read model |
 |----------|-------|-----------------------|
-| `guide_tender_lifecycle` (CMD) | `initiate_tender_profile` (at boot), `describe_tender_profile`, `archive_tender_profile`; `spot_tender`, `amend_tender`, `note_tender_award`, `dismiss_tender`; `pursue_tender`, `decline_tender`, `submit_tender_bid`, `record_tender_outcome`; process manager `on_tender_notice_reported_v1_maybe_spot_tender` | the realm's profile, keyed by the realm; one dossier per tender |
-| `project_tenders` (PRJ) | one projection per event | `tenders.sqlite3`: the profile and the tenders |
-| `query_tenders` (QRY) | `get_tender_profile`, `get_tenders_page`, `get_tender_by_id` | reads `tenders.sqlite3` |
+| `guide_tender_lifecycle` (CMD) | `initiate_tender_profile` (at boot), `describe_tender_profile`, `archive_tender_profile`; `spot_tender`, `amend_tender`, `note_tender_award`, `dismiss_tender`; `pursue_tender`, `decline_tender`, `submit_tender_bid`, `record_tender_outcome`; `attach_tender_document`, `record_tender_question`; process manager `on_tender_notice_reported_v1_maybe_spot_tender` | the realm's profile, keyed by the realm; one dossier per tender |
+| `project_tenders` (PRJ) | one projection per event | `tenders.sqlite3`: the profile, the tenders, and a pursuit's documents and questions |
+| `query_tenders` (QRY) | `get_tender_profile`, `get_tenders_page`, `get_tender_by_id`, `get_tender_pursuit` | reads `tenders.sqlite3` |
 | `sense_tender_notices` (sensor) | `sense_ted_notices` | none: it reports facts, sealed |
 
 **The morning list fills once the tenders group is set up.** The node subscribes
@@ -63,9 +63,8 @@ variables are set (see Configuration); before, both wait and `/health` stays
 green. "Asking for today's tenders" below walks a realm from nothing to an
 agent reading the list.
 
-Not built yet: the bid's documents and the buyer's questions on a pursuit
-(#4), the fit by similarity to the profile's description (#4), and the admin
-UI on the LAN where the bid team sets the profile.
+Not built yet: the fit by similarity to the profile's description (#25), and
+the admin UI on the LAN where the bid team sets the profile.
 
 ## Procedures
 
@@ -91,6 +90,9 @@ the wire contract.
 | `mcl-tenders/decline_tender` | `{"tender_id"}` | `{}`: a pursued tender gets no bid after all; the caller is recorded |
 | `mcl-tenders/submit_tender_bid` | `{"tender_id"}` | `{}`: the bid for a pursued tender went in; the caller is recorded |
 | `mcl-tenders/record_tender_outcome` | `{"tender_id", "outcome"}` | `{}`: `outcome` is `won` or `lost`, once the bid went in; the caller is recorded |
+| `mcl-tenders/attach_tender_document` | `{"tender_id", "name", "sha256", "location"}` | `{}`: a document of the pursuit is kept with a pursued tender; the file stays on the node; the caller is recorded |
+| `mcl-tenders/record_tender_question` | `{"tender_id", "question"}` | `{}`: a question to the buyer is kept with a pursued tender; the caller is recorded |
+| `mcl-tenders/get_tender_pursuit` | `{"tender_id"}` | `{documents, questions}`: the pursuit's documents and questions, oldest first |
 
 ### Open reads
 
@@ -100,8 +102,10 @@ the wire contract.
 They show the realm's tenders, built from public TED notices, including who
 dismissed one. A node of another realm is still refused, and the calls must
 still be sealed. The profile (`describe_tender_profile`, `get_tender_profile`:
-what the realm looks for), `dismiss_tender`, the four pursuit procedures and
-`archive_tender_profile` stay with the tenders role whatever the switch says. Any other value, or none,
+what the realm looks for), `dismiss_tender`, the four pursuit procedures, the pursuit's documents and
+questions (`attach_tender_document`, `record_tender_question` and
+`get_tender_pursuit`) and `archive_tender_profile` stay with the tenders role
+whatever the switch says. Any other value, or none,
 keeps the reads with the role. `/health` info says which: `reads` is `role`
 or `members`. To close them again, remove the line and redeploy.
 
@@ -127,6 +131,22 @@ is empty, `won` or `lost`. A line of `text` ends with where the pursuit stands
 (`| pursuit: pursuing`, `bid submitted`, `declined`, `won` or `lost`) once the
 tender is pursued.
 
+**A pursuit's documents and questions** are the bid team's own, so they are
+kept apart from the dossier and read through `get_tender_pursuit`, which the
+open reads switch never opens. Both are taken only on a pursued tender, as
+often as the bid team needs, also after a decline, the bid or the outcome. A
+document is its `name` (up to 255 bytes) and `location` (up to 1024 bytes,
+where the file lies on the node), each one line of text under the same rule
+as a keyword, and `sha256`, the file's SHA-256 as 64 lowercase hex digits.
+The file itself never travels: only these three do, sealed. Attaching the
+same digest again renames or moves the document. A `question` is up to 4000
+bytes, line breaks allowed; its `question_id` is the SHA-256 of its text in
+lowercase hex, so the same question recorded twice is one question, kept with
+who recorded it first. Each
+document answers `{name, sha256, location, attached_by, attached_at}` and
+each question `{question_id, question, recorded_by, recorded_at}`, the
+caller a 64-hex node id as above. Neither changes a tender's `status`.
+
 The Answer column is a contract a test holds to: `mcl_tenders_wire_replies_tests`
 calls each responder against a real store and read model, reads its reply
 through macula's own CBOR codec, and fails when a reply's keys or a key named
@@ -146,12 +166,15 @@ here change.
 | `pursued` | the tender is pursued, so it is not dismissed: decline it instead |
 | `dismissed` | the tender was dismissed, so it is not pursued |
 | `already_pursued` | the tender is pursued already |
-| `not_pursued` | decline or submit a bid only on a pursued tender |
+| `not_pursued` | decline, submit a bid, attach a document or record a question only on a pursued tender |
 | `declined`, `already_declined` | the pursuit was declined: no bid goes in, and it is not declined twice |
 | `already_submitted` | the bid went in: it is not submitted again, and no longer declined |
 | `not_submitted` | an outcome is recorded only once the bid went in |
 | `invalid_outcome` | `outcome` is `won` or `lost` |
 | `already_recorded` | the outcome was recorded before |
+| `invalid_document_name`, `invalid_location` | the document's name, 1 to 255 bytes, or its place, 1 to 1024 bytes: one line, the same text rule as a keyword |
+| `invalid_sha256` | the document's SHA-256 is 64 lowercase hex digits |
+| `invalid_question` | the question, 1 to 4000 bytes: the same text rule as the description |
 | `archived` | the profile is archived: it is not read, and not described again |
 | `already_archived` | the profile was archived before |
 | `no_caller` | the CALL carried no 32-byte node id |
