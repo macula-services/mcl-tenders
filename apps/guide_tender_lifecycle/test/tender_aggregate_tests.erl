@@ -204,3 +204,74 @@ a_pursuit_command_names_a_caller_a_valid_id_and_an_outcome_test() ->
                   record_tender_outcome_v1:new(#{realm => realm(), recorded_by => member(),
                                                  tender_id => Id, outcome => Bad}))
      || Bad <- [<<"WON">>, <<"draw">>, <<>>, undefined, won]].
+
+%% The pursuit's papers (#25): a document or a question, by the role holder.
+document(Sha) ->
+    pursuit(attach_tender_document_v1, attached_by,
+            #{name => <<"offer.pdf">>, sha256 => Sha, location => <<"bids/offer.pdf">>}).
+
+question(Text) -> pursuit(record_tender_question_v1, recorded_by, #{question => Text}).
+
+-define(SHA, <<"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef">>).
+
+papers_come_only_with_a_pursuit_test() ->
+    ?assertEqual({error, not_spotted}, steps([document(?SHA)])),
+    ?assertEqual({error, not_spotted}, steps([question(<<"Q?">>)])),
+    ?assertEqual({error, not_pursued}, steps([spot(), document(?SHA)])),
+    ?assertEqual({error, not_pursued}, steps([spot(), question(<<"Q?">>)])).
+
+%% As often as the bid team needs, whatever the pursuit has come to, and
+%% without a flag of their own.
+papers_come_as_often_as_needed_test() ->
+    {ok, S} = steps([spot(), pursue(), document(?SHA), question(<<"Q?">>), submit(),
+                     document(?SHA), question(<<"Q2?">>), outcome(<<"lost">>), question(<<"Q3?">>)]),
+    ?assertEqual(?TENDER_SPOTTED bor ?TENDER_PURSUED bor ?TENDER_BID_SUBMITTED bor ?TENDER_LOST,
+                 tender_state:status(S)),
+    {ok, Declined} = steps([spot(), pursue(), decline()]),
+    ?assertMatch({ok, _}, step(Declined, document(?SHA))).
+
+each_paper_event_names_its_caller_and_keeps_no_more_test() ->
+    {ok, Pursued} = steps([spot(), pursue()]),
+    {ok, [Doc]} = tender_aggregate:execute(Pursued, document(?SHA)),
+    ?assertMatch(#{event_type := <<"tender_document_attached_v1">>, name := <<"offer.pdf">>,
+                   sha256 := ?SHA, location := <<"bids/offer.pdf">>, attached_at := _}, Doc),
+    ?assertEqual(member(), maps:get(attached_by, Doc)),
+    {ok, [Q]} = tender_aggregate:execute(Pursued, question(<<"Q?">>)),
+    ?assertMatch(#{event_type := <<"tender_question_recorded_v1">>, question := <<"Q?">>}, Q),
+    ?assertEqual(member(), maps:get(recorded_by, Q)),
+    ?assertEqual(binary:encode_hex(crypto:hash(sha256, <<"Q?">>), lowercase), maps:get(question_id, Q)).
+
+a_document_names_a_caller_a_valid_id_a_name_a_digest_and_a_place_test() ->
+    Id = tender_notice:tender_id(notice()),
+    Good = #{realm => realm(), attached_by => member(), tender_id => Id, name => <<"offer.pdf">>,
+             sha256 => ?SHA, location => <<"bids/offer.pdf">>},
+    ?assertMatch({ok, _}, attach_tender_document_v1:new(Good)),
+    [?assertEqual({error, Why}, attach_tender_document_v1:new(maps:merge(Good, Bad)))
+     || {Why, Bad} <- [{no_caller, #{attached_by => undefined}},
+                       {invalid_tender_id, #{tender_id => <<"x/y">>}},
+                       {invalid_document_name, #{name => <<>>}},
+                       {invalid_document_name, #{name => binary:copy(<<"a">>, 256)}},
+                       {invalid_document_name, #{name => <<"offer", 16#e2, 16#80, 16#ae, ".pdf">>}},
+                       {invalid_document_name, #{name => <<"a\nb">>}},
+                       {invalid_sha256, #{sha256 => string:uppercase(?SHA)}},
+                       {invalid_sha256, #{sha256 => binary:part(?SHA, 0, 63)}},
+                       {invalid_sha256, #{sha256 => <<?SHA/binary, "\n">>}},
+                       {invalid_sha256, #{sha256 => undefined}},
+                       {invalid_location, #{location => <<>>}},
+                       {invalid_location, #{location => binary:copy(<<"a">>, 1025)}},
+                       {invalid_location, #{location => <<"a", 0, "b">>}}]],
+    ?assertEqual({error, invalid_realm}, attach_tender_document_v1:new(maps:remove(realm, Good))).
+
+a_question_names_a_caller_a_valid_id_and_its_text_test() ->
+    Id = tender_notice:tender_id(notice()),
+    Good = #{realm => realm(), recorded_by => member(), tender_id => Id,
+             question => <<"Line one\nline two">>},
+    ?assertMatch({ok, _}, record_tender_question_v1:new(Good)),
+    [?assertEqual({error, Why}, record_tender_question_v1:new(maps:merge(Good, Bad)))
+     || {Why, Bad} <- [{no_caller, #{recorded_by => <<1, 2>>}},
+                       {invalid_tender_id, #{tender_id => <<>>}},
+                       {invalid_question, #{question => <<>>}},
+                       {invalid_question, #{question => binary:copy(<<"a">>, 4001)}},
+                       {invalid_question, #{question => <<"zero", 16#e2, 16#80, 16#8b, "width">>}},
+                       {invalid_question, #{question => <<"tab\there">>}},
+                       {invalid_question, #{question => 42}}]].

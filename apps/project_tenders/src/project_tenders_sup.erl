@@ -21,7 +21,9 @@ projections() ->
      tender_pursued_v1_to_tenders,
      tender_declined_v1_to_tenders,
      tender_bid_submitted_v1_to_tenders,
-     tender_outcome_recorded_v1_to_tenders].
+     tender_outcome_recorded_v1_to_tenders,
+     tender_document_attached_v1_to_tender_documents,
+     tender_question_recorded_v1_to_tender_questions].
 
 %% @doc Where the read model lives: beside the event store, under the same
 %% MCL_DATA_DIR and the same default as mcl_tenders_service:event_store/0. A

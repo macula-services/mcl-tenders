@@ -7,7 +7,9 @@
 %%% correction) | note_tender_award (once) | dismiss_tender (once, "not for
 %%% us", before any pursuit). The pursuit (#4b): pursue_tender (bid, once) ->
 %%% decline_tender (no bid after all) | submit_tender_bid -> record_tender_outcome
-%%% (won or lost, once). Corrections and the award keep folding into the same
+%%% (won or lost, once). While it is pursued, whatever comes after
+%%% (#25): attach_tender_document and record_tender_question, each as often as
+%%% the bid team needs. Corrections and the award keep folding into the same
 %%% dossier while it is pursued, so a pursuit sees them without anyone retyping
 %%% them.
 %%%
@@ -85,6 +87,14 @@ do_execute(record_tender_outcome_v1, Status, Payload) ->
                    {lacks, ?TENDER_BID_SUBMITTED, not_submitted},
                    {has, [?TENDER_WON, ?TENDER_LOST], already_recorded}],
           fun() -> maybe_record_tender_outcome:handle_from_map(Payload) end);
+do_execute(attach_tender_document_v1, Status, Payload) ->
+    ruled(Status, [{lacks, ?TENDER_SPOTTED, not_spotted},
+                   {lacks, ?TENDER_PURSUED, not_pursued}],
+          fun() -> maybe_attach_tender_document:handle_from_map(Payload) end);
+do_execute(record_tender_question_v1, Status, Payload) ->
+    ruled(Status, [{lacks, ?TENDER_SPOTTED, not_spotted},
+                   {lacks, ?TENDER_PURSUED, not_pursued}],
+          fun() -> maybe_record_tender_question:handle_from_map(Payload) end);
 do_execute(_Unknown, _Status, _Payload) ->
     {error, unknown_command}.
 

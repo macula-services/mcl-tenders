@@ -155,16 +155,20 @@ capabilities() ->
      || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>,
                  <<"archive_tender_profile">>, <<"get_tenders_page">>, <<"get_tender_by_id">>,
                  <<"dismiss_tender">>, <<"pursue_tender">>, <<"decline_tender">>,
-                 <<"submit_tender_bid">>, <<"record_tender_outcome">>]]
+                 <<"submit_tender_bid">>, <<"record_tender_outcome">>,
+                 <<"attach_tender_document">>, <<"record_tender_question">>,
+                 <<"get_tender_pursuit">>]]
         ++ group_keys(tender_notices_group:org_key_id()).
 
 %% THE OPEN READS SWITCH. `MCL_TENDERS_OPEN_READS=1' opens the two reads of
 %% the morning list, and only those, to every member of the realm: the list
 %% and one tender, built from public TED notices. Anything else, unset
 %% included, keeps them for the tenders role. The profile (what the realm
-%% looks for), dismissing a tender, the pursuit and archiving the profile stay
-%% with the role whatever the switch says, and every procedure stays sealed. A member
-%% is still an identity the realm admitted, never a node of another realm.
+%% looks for), dismissing a tender, the pursuit with its documents and
+%% questions (get_tender_pursuit included) and archiving the profile stay with
+%% the role whatever the switch says, and every procedure stays sealed. A
+%% member is still an identity the realm admitted, never a node of another
+%% realm.
 read_callers("1") -> members;
 read_callers(_) -> role.
 
