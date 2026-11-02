@@ -62,6 +62,30 @@ only_the_newest_release_moves_latest_test() ->
         file:del_dir_r(Repo)
     end.
 
+%% A PRERELEASE IS A REHEARSAL, NOT A RELEASE (mcl-tenders#17). The script
+%% picked the newest tag with git's `--sort=-v:refname', which puts v1.1.0-rc1
+%% ABOVE v1.1.0: git reads "rc1" as text after the empty suffix a plain release
+%% has, where SemVer sorts a prerelease before the release it precedes. An rc
+%% would move :latest to a rehearsal, and the release cut after it would never
+%% reach :latest at all. Every row runs against real tags in a throwaway
+%% repository, because the answer depends on what git sorts rather than on what
+%% the script says it sorts.
+only_a_plain_release_moves_latest_test() ->
+    Rows = [{["v1.0.0", "v1.1.0-rc1"], "v1.1.0-rc1", {0, "promote=false"}},
+            {["v1.0.0-rc1", "v1.0.0"], "v1.0.0", {0, "promote=true"}},
+            {["v1.0.0", "v1.1.0-rc1"], "v1.0.0", {0, "promote=true"}},
+            {["v1.0.0", "v1.0.1"], "v1.0.0", {0, "promote=false"}},
+            {["v1.0.0", "v1.0.1"], "v1.0.1", {0, "promote=true"}}],
+    lists:foreach(fun({Tags, Tag, Expected}) ->
+                          Repo = repo_with_tags(Tags),
+                          try
+                              ?assertEqual({Tags, Tag, Expected},
+                                           {Tags, Tag, newest(Repo, Tag)})
+                          after
+                              file:del_dir_r(Repo)
+                          end
+                  end, Rows).
+
 %% And the workflow asks it, with every tag fetched, one promotion at a time.
 promote_latest_is_serialised_and_asks_whether_it_is_newest_test() ->
     Promote = proplists:get_value("promote-latest", jobs(workflow())),
@@ -91,14 +115,24 @@ run(Cmd0) ->
     {Body, ["exit=" ++ Status]} = lists:split(length(Lines) - 1, Lines),
     {list_to_integer(Status), lists:flatten(lists:join("\n", Body))}.
 
-%% A throwaway repository, one commit per tag, tagged in the order given.
+%% A throwaway repository, one commit per tag, tagged in the order given. The
+%% tags are read back before the repository is handed out: one that silently
+%% failed to be cut answers "newest" for the wrong reason, and a row would then
+%% pass on an empty list. Signing is off explicitly for the same reason -- a
+%% developer whose global git signs tags gets no tag at all here.
 repo_with_tags(Tags) ->
     Repo = filename:join(["/tmp", "mcl_tenders_image_channels_tests",
                           integer_to_list(erlang:unique_integer([positive]))]),
     ok = filelib:ensure_path(Repo),
-    Git = "git -C " ++ Repo ++ " -c user.name=test -c user.email=test@example.invalid ",
-    _ = os:cmd(Git ++ "init -q"),
-    [os:cmd(Git ++ "commit -q --allow-empty -m " ++ T ++ " && " ++ Git ++ "tag " ++ T) || T <- Tags],
+    Git = "git -C " ++ Repo ++ " -c user.name=test -c user.email=test@example.invalid "
+          ++ "-c tag.gpgsign=false -c tag.forceSignAnnotated=false ",
+    {0, _} = run(Git ++ "init -q"),
+    [begin
+         {0, _} = run(Git ++ "commit -q --allow-empty -m " ++ T),
+         {0, _} = run(Git ++ "tag " ++ T)
+     end || T <- Tags],
+    {0, Cut} = run(Git ++ "tag -l"),
+    ?assertEqual(lists:sort(Tags), lists:sort(string:split(string:trim(Cut), "\n", all))),
     Repo.
 
 newest(Repo, Tag) ->
