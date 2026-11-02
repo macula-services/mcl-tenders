@@ -227,14 +227,20 @@ success looks like; stop at the first that does not show it.
 5. **The group grant**, until macula-services/mcl-om#48 makes it go away. The
    node id is on the Members page, the `mcl-tenders` row. From a checkout of
    this repository, copy the writer to the node's box once, then mint the
-   grant on the realm box (in its macula-realm checkout, where the org keys
-   live) and pipe it straight into the node box's secret env file, so the
-   token is never shown and never lands anywhere else:
+   grant inside the running realm (the minter runs on the realm box, as a user
+   that may run docker, through the realm release's rpc; set `CONTAINER` if
+   the realm's container is not `macula-realm`) and pipe it straight into the
+   node box's secret env file, so the token is never shown and never lands
+   anywhere else:
 
        scp scripts/set-tenders-group-env.sh <node box>:
-       ssh <realm box> 'cd <macula-realm checkout> && bash -s -- <node id>' < scripts/mint-tenders-group-ucan.sh \
+       ssh <realm box> 'bash -s -- <node id>' < scripts/mint-tenders-group-ucan.sh \
          | ssh <node box> './set-tenders-group-env.sh'
 
+   Minting writes nothing on the realm. It uses the realm's `mcl-tenders` org
+   key (step 1) and refuses with `REFUSED: this realm holds no mcl-tenders
+   org key yet` if the realm has none, rather than make one that no org
+   directory names. The grant names the realm the box serves.
    *Success:* the last line reads `wrote ~/.macula/secrets/mcl-tenders.env
    (0600): MCL_GROUP_ORG_KEY_ID=<hex>, MCL_TENDERS_GROUP_UCAN (<n> characters)`.
    The grant is valid 30 days; mint again before then. An expired grant idles

@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- **The group grant mints on the real realm box.** The realm runs there as a
+  release in a container, with no checkout and no `mix`, so
+  `scripts/mint-tenders-group-ucan.sh` now runs its program inside the
+  realm's node through the release's rpc (`CONTAINER`, default
+  `macula-realm`), as macula-realm's own operator scripts do. It writes
+  nothing on the realm: with no `mcl-tenders` org key it refuses instead of
+  making one. The grant names the realm the box serves, so the realm name
+  argument is gone. Scripts and README only; the image is unchanged.
+
 ## [0.3.0] - 2026-11-02
 
 Refs macula-services/mcl-tenders#4, #11 and #15.
