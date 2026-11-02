@@ -16,6 +16,10 @@ describe() ->
                                                  countries => [<<"BEL">>]}),
     describe_tender_profile_v1:to_map(Cmd).
 
+archive() ->
+    {ok, Cmd} = archive_tender_profile_v1:new(#{realm => ?REALM, archived_by => ?MEMBER}),
+    archive_tender_profile_v1:to_map(Cmd).
+
 fresh() ->
     {ok, S} = tender_profile_aggregate:init(?REALM),
     S.
@@ -61,6 +65,28 @@ the_state_holds_no_profile_term_test() ->
     {ok, S1} = step(fresh(), initiate()),
     {ok, S2} = step(S1, describe()),
     ?assertEqual(#{realm => ?REALM, status => 3}, tender_profile_state:to_map(S2)).
+
+a_profile_not_initiated_cannot_be_archived_test() ->
+    ?assertEqual({error, not_initiated}, step(fresh(), archive())).
+
+archiving_the_profile_records_who_and_when_test() ->
+    {ok, S} = step(fresh(), initiate()),
+    {ok, [Ev]} = tender_profile_aggregate:execute(S, archive()),
+    ?assertMatch(#{event_type := <<"tender_profile_archived_v1">>, realm := ?REALM,
+                   archived_by := ?MEMBER, archived_at := At} when is_integer(At), Ev),
+    {ok, S2} = step(S, archive()),
+    ?assertEqual(1 bor 4, tender_profile_state:status(S2)).
+
+%% Archived is the end of the profile's life: nothing more is recorded on it.
+an_archived_profile_is_neither_archived_again_nor_described_test() ->
+    {ok, S1} = step(fresh(), initiate()),
+    {ok, S2} = step(S1, describe()),
+    {ok, S3} = step(S2, archive()),
+    ?assertEqual(1 bor 2 bor 4, tender_profile_state:status(S3)),
+    ?assertEqual({error, already_archived}, step(S3, archive())),
+    ?assertEqual({error, archived}, step(S3, describe())),
+    %% A boot after the archive still finds the profile there, as it wants.
+    ?assertEqual({error, already_initiated}, step(S3, initiate())).
 
 an_unknown_command_is_refused_test() ->
     ?assertEqual({error, unknown_command},

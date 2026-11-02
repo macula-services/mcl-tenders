@@ -13,6 +13,7 @@ start_link() -> supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 projections() ->
     [tender_profile_initiated_v1_to_tender_profiles,
      tender_profile_described_v1_to_tender_profiles,
+     tender_profile_archived_v1_to_tender_profiles,
      tender_spotted_v1_to_tenders,
      tender_amended_v1_to_tenders,
      tender_award_noted_v1_to_tenders,

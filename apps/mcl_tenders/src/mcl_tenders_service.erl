@@ -51,7 +51,7 @@
 %% never a notice or a profile.
 info() ->
     #{name => <<"mcl-tenders">>,
-      version => <<"0.1.0">>,
+      version => <<"0.1.1">>,
       description => <<"Public tenders that fit a realm's profile, guided from spotted to bid on the realm's own node">>,
       sealing => sealing(tender_notices_group:missing()),
       intake => intake(tender_intake:today()),
@@ -115,7 +115,7 @@ health() -> ok.
 %% once the org key id is known, the tenders group's distributor.
 capabilities() ->
     [procedure(Name) || Name <- [<<"describe_tender_profile">>, <<"get_tender_profile">>,
-                                 <<"get_tenders_page">>, <<"get_tender_by_id">>,
+                                 <<"archive_tender_profile">>, <<"get_tenders_page">>, <<"get_tender_by_id">>,
                                  <<"dismiss_tender">>]]
         ++ group_keys(tender_notices_group:org_key_id()).
 

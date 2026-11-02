@@ -18,7 +18,11 @@ read_side_test_() ->
       {timeout, 60, fun a_refused_description_changes_nothing/0},
       {timeout, 60, fun a_replayed_older_description_changes_nothing/0},
       {timeout, 60, fun the_read_needs_a_realm_id/0},
-      {timeout, 60, fun the_read_model_is_a_write_ahead_log/0}]}.
+      {timeout, 60, fun the_read_model_is_a_write_ahead_log/0},
+      {timeout, 60, fun the_read_model_has_every_column_the_query_selects/0},
+      %% Last: archived is terminal.
+      {timeout, 60, fun an_archived_profile_is_no_longer_read/0},
+      {timeout, 60, fun a_replayed_description_does_not_undo_the_archive/0}]}.
 
 realm() -> mcl_tenders_pipeline:realm().
 
@@ -95,3 +99,44 @@ the_read_model_is_a_write_ahead_log() ->
     ?assertEqual([[<<"wal">>]], tenders_query_store:q("PRAGMA journal_mode", [])),
     ?assertEqual([[2000]], tenders_query_store:q("PRAGMA busy_timeout", [])),
     ?assertEqual([[2000]], tenders_read_model_store:q("PRAGMA busy_timeout", [])).
+
+%% The schema contract tenders_read_model_store's moduledoc names: every column
+%% the query desk selects is one the read model has, after its migrations.
+the_read_model_has_every_column_the_query_selects() ->
+    Have = [binary_to_list(Name) || [_Cid, Name | _] <- tenders_query_store:q(
+                                                          "PRAGMA table_info(tender_profiles)", [])],
+    ?assertEqual([], (get_tender_profile:columns() ++ ["archived_at", "archived_by"]) -- Have).
+
+%% The realm stops looking: the profile is no longer read by anyone, the
+%% sensor idles on it, and nothing more is recorded on it.
+an_archived_profile_is_no_longer_read() ->
+    ?assertEqual({<<"archive_tender_profile">>, #{<<"reason">> => {text, <<"no_caller">>}}},
+                 mcl_tenders_pipeline:call(<<"archive_tender_profile">>, #{}, undefined)),
+    ?assertMatch({ok, _}, profile()),
+    ?assertEqual({<<"archive_tender_profile">>, #{}}, archived()),
+    mcl_tenders_pipeline:eventually(fun profile/0, {error, archived}),
+    ?assertEqual({idle, archived}, sense_ted_notices:interest_in(profile())),
+    ?assertEqual([[binary:encode_hex(?MEMBER, lowercase)]],
+                 tenders_query_store:q("SELECT archived_by FROM tender_profiles"
+                                       " WHERE archived_at IS NOT NULL", [])),
+    ?assertEqual({<<"archive_tender_profile">>, #{<<"reason">> => {text, <<"already_archived">>}}},
+                 archived()),
+    ?assertEqual({<<"describe_tender_profile">>, #{<<"reason">> => {text, <<"archived">>}}},
+                 described(#{countries => [{text, <<"BEL">>}]})),
+    ?assertEqual({<<"get_tender_profile">>, #{<<"reason">> => {text, <<"archived">>}}},
+                 mcl_tenders_pipeline:call(<<"get_tender_profile">>, #{}, ?MEMBER)),
+    %% A boot after the archive finds the profile there and starts as before.
+    ?assertEqual(ok, maybe_initiate_tender_profile:for_realm(realm())).
+
+%% Events of one stream reach the projections in any order: a description
+%% delivered after the archive does not bring the profile back.
+a_replayed_description_does_not_undo_the_archive() ->
+    Late = #{data => #{realm => realm(), described_by => ?MEMBER, cpv_codes => [],
+                       countries => [<<"NLD">>], keywords => [], exclusions => [],
+                       description => <<>>, described_at => 2},
+             version => 99},
+    {ok, _} = tender_profile_described_v1_to_tender_profiles:handle_event(
+                <<"tender_profile_described_v1">>, Late, #{}, #{}),
+    ?assertEqual({error, archived}, profile()).
+
+archived() -> mcl_tenders_pipeline:call(<<"archive_tender_profile">>, #{}, ?MEMBER).

@@ -49,7 +49,7 @@
 <circle class="head" cx="76" cy="54" r="9"/>
 <text class="t-name" x="94" y="58">Tenders role holder</text>
 <text class="t-type" x="94" y="76">[Person or agent of the realm]</text>
-<text class="t-desc" x="66" y="100">Describes or reads the profile;</text>
+<text class="t-desc" x="66" y="100">Describes, reads or archives the profile;</text>
 <text class="t-desc" x="66" y="116">lists, reads and dismisses tenders,</text>
 <text class="t-desc" x="66" y="132">through sealed calls</text>
 <rect class="b-mac" x="400" y="30" width="300" height="120" rx="10"/>
@@ -66,16 +66,16 @@
 <rect class="bound" x="30" y="190" width="1440" height="860" rx="12"/>
 <text class="t-bound" x="46" y="1040">mcl-tenders [one release]: the profile, the sensor and the morning list</text>
 <rect class="b-cmp" x="50" y="230" width="300" height="150" rx="10"/>
-<text class="t-code" x="66" y="258">describe_tender_profile_responder</text>
+<text class="t-code" x="66" y="258">describe_ and archive_ responders</text>
 <text class="t-type" x="66" y="276">[guide_tender_lifecycle]</text>
-<text class="t-desc" x="66" y="300">Checks every field: CPV codes,</text>
-<text class="t-desc" x="66" y="316">countries, keywords, exclusions,</text>
-<text class="t-desc" x="66" y="332">a description. The caller is</text>
-<text class="t-desc" x="66" y="348">the one who described it.</text>
+<text class="t-desc" x="66" y="300">describe checks every field; archive</text>
+<text class="t-desc" x="66" y="316">ends the realm's search, for good.</text>
+<text class="t-desc" x="66" y="332">Each records the caller as who</text>
+<text class="t-desc" x="66" y="348">described or archived it.</text>
 <rect class="b-sys" x="400" y="230" width="300" height="150" rx="10"/>
 <text class="t-code" x="416" y="258">mcl_tenders_service</text>
 <text class="t-type" x="416" y="276">[mcl_om service contract]</text>
-<text class="t-desc" x="416" y="300">Announces its five procedures,</text>
+<text class="t-desc" x="416" y="300">Announces its six procedures,</text>
 <text class="t-desc" x="416" y="316">sealed, for the tenders role only.</text>
 <text class="t-desc" x="416" y="332">At boot, initiates the realm's</text>
 <text class="t-desc" x="416" y="348">profile once. /health: intake, quiet.</text>
@@ -88,8 +88,8 @@
 <rect class="b-cmp" x="50" y="430" width="300" height="150" rx="10"/>
 <text class="t-code" x="66" y="458">tender_profile_aggregate</text>
 <text class="t-type" x="66" y="476">[guide_tender_lifecycle, CMD]</text>
-<text class="t-desc" x="66" y="500">maybe_initiate_tender_profile and</text>
-<text class="t-desc" x="66" y="516">maybe_describe_tender_profile. One</text>
+<text class="t-desc" x="66" y="500">maybe_initiate_, maybe_describe_,</text>
+<text class="t-desc" x="66" y="516">maybe_archive_tender_profile. One</text>
 <text class="t-desc" x="66" y="532">dossier per realm; its state holds</text>
 <text class="t-desc" x="66" y="548">flags only, never the profile.</text>
 <rect class="b-cmp" x="400" y="430" width="300" height="150" rx="10"/>
@@ -176,7 +176,7 @@
 <path class="edge" d="M750 90H700" marker-end="url(#a)"/>
 <text class="t-rel" x="725" y="82" text-anchor="middle">role</text>
 <path class="edge" d="M450 150V205H200V230" marker-end="url(#a)"/>
-<text class="t-rel" x="208" y="200">describe_tender_profile</text>
+<text class="t-rel" x="208" y="200">describe_ / archive_tender_profile</text>
 <path class="edge" d="M650 150V205H900V230" marker-end="url(#a)"/>
 <text class="t-rel" x="892" y="200" text-anchor="end">get_tender_profile</text>
 <path class="edge" d="M200 380V430" marker-end="url(#a)"/>

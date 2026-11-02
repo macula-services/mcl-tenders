@@ -4,7 +4,13 @@
 %% A NIF connection belongs to the process that opened it, so every write goes
 %% through this process. The DDL lives here and only here; query_tenders reads
 %% the schema this module creates, and a schema-contract test pins the columns
-%% the query desks select to the columns declared here.
+%% the query desks select to the columns this module declares.
+%%
+%% THE SCHEMA MOVES FORWARD IN PLACE. schema/0 is the table as 0.1.0 created
+%% it and never changes; migrations/0 is every change since, each applied once,
+%% in a transaction, on the boot that finds the file's PRAGMA user_version
+%% below it. A box that ran an earlier release keeps its rows; a new file goes
+%% through the same steps.
 %%
 %% Every write is one upsert that sets only the columns of the event it
 %% projects, so events of one stream may arrive in any order. The description
@@ -31,7 +37,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/1, exec/2, q/2, schema/0]).
+-export([start_link/1, exec/2, q/2, schema/0, migrations/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, format_status/1]).
 
 -record(state, {conn :: esqlite3:esqlite3()}).
@@ -51,45 +57,53 @@ schema() ->
      " description        TEXT NOT NULL DEFAULT '',"
      " described_by       TEXT NOT NULL DEFAULT '',"
      " described_at       INTEGER NOT NULL DEFAULT 0,"
-     " described_version  INTEGER NOT NULL DEFAULT -1)",
-     %% One row per spotted tender. The correctable columns (deadline_at to
-     %% description_lang) hold the newest correction's value where it gave
-     %% one, the spotted notice's otherwise. `titles' is a JSON object,
-     %% language to title; the code lists are newline-separated. `status' is
-     %% tender_state's bit flags, OR-ed in by each projection. A row an event
-     %% other than tender_spotted_v1 created first has spotted_at NULL, and
-     %% the query side treats it as not there.
-     "CREATE TABLE IF NOT EXISTS tenders ("
-     " realm              TEXT NOT NULL,"
-     " tender_id          TEXT NOT NULL,"
-     " status             INTEGER NOT NULL DEFAULT 0,"
-     " publication_number TEXT NOT NULL DEFAULT '',"
-     " procedure_id       TEXT NOT NULL DEFAULT '',"
-     " notice_type        TEXT NOT NULL DEFAULT '',"
-     " buyer_name         TEXT NOT NULL DEFAULT '',"
-     " buyer_country      TEXT NOT NULL DEFAULT '',"
-     " cpv_codes          TEXT NOT NULL DEFAULT '',"
-     " deadline_at        INTEGER NOT NULL DEFAULT 0,"
-     " estimated_value    TEXT NOT NULL DEFAULT '',"
-     " currency           TEXT NOT NULL DEFAULT '',"
-     " titles             TEXT NOT NULL DEFAULT '{}',"
-     " description        TEXT NOT NULL DEFAULT '',"
-     " description_lang   TEXT NOT NULL DEFAULT '',"
-     " published_at       INTEGER NOT NULL DEFAULT 0,"
-     " matched_cpv_codes  TEXT NOT NULL DEFAULT '',"
-     " matched_keywords   TEXT NOT NULL DEFAULT '',"
-     " fit_rank           INTEGER NOT NULL DEFAULT 0,"
-     " spotted_at         INTEGER,"
-     " corrected_by       TEXT NOT NULL DEFAULT '',"
-     " amended_at         INTEGER NOT NULL DEFAULT 0,"
-     " amended_version    INTEGER NOT NULL DEFAULT -1,"
-     " award_publication_number TEXT NOT NULL DEFAULT '',"
-     " award_published_at INTEGER NOT NULL DEFAULT 0,"
-     " dismissed_by       TEXT NOT NULL DEFAULT '',"
-     " dismissed_at       INTEGER NOT NULL DEFAULT 0,"
-     " PRIMARY KEY (realm, tender_id))",
-     "CREATE INDEX IF NOT EXISTS tenders_by_morning"
-     " ON tenders (realm, published_at DESC, fit_rank DESC)"].
+     " described_version  INTEGER NOT NULL DEFAULT -1)"].
+
+%% @doc Every change to the schema since 0.1.0, as {UserVersion, Statements}
+%% in ascending order. Append only: a step a box has applied is never edited.
+-spec migrations() -> [{pos_integer(), [string()]}].
+migrations() ->
+    [{1, ["ALTER TABLE tender_profiles ADD COLUMN archived_at INTEGER",
+          "ALTER TABLE tender_profiles ADD COLUMN archived_by TEXT NOT NULL DEFAULT ''"]},
+     %% The morning list (#4).
+     {2, [%% One row per spotted tender. The correctable columns (deadline_at to
+         %% description_lang) hold the newest correction's value where it gave
+         %% one, the spotted notice's otherwise. `titles' is a JSON object,
+         %% language to title; the code lists are newline-separated. `status' is
+         %% tender_state's bit flags, OR-ed in by each projection. A row an event
+         %% other than tender_spotted_v1 created first has spotted_at NULL, and
+         %% the query side treats it as not there.
+         "CREATE TABLE IF NOT EXISTS tenders ("
+         " realm              TEXT NOT NULL,"
+         " tender_id          TEXT NOT NULL,"
+         " status             INTEGER NOT NULL DEFAULT 0,"
+         " publication_number TEXT NOT NULL DEFAULT '',"
+         " procedure_id       TEXT NOT NULL DEFAULT '',"
+         " notice_type        TEXT NOT NULL DEFAULT '',"
+         " buyer_name         TEXT NOT NULL DEFAULT '',"
+         " buyer_country      TEXT NOT NULL DEFAULT '',"
+         " cpv_codes          TEXT NOT NULL DEFAULT '',"
+         " deadline_at        INTEGER NOT NULL DEFAULT 0,"
+         " estimated_value    TEXT NOT NULL DEFAULT '',"
+         " currency           TEXT NOT NULL DEFAULT '',"
+         " titles             TEXT NOT NULL DEFAULT '{}',"
+         " description        TEXT NOT NULL DEFAULT '',"
+         " description_lang   TEXT NOT NULL DEFAULT '',"
+         " published_at       INTEGER NOT NULL DEFAULT 0,"
+         " matched_cpv_codes  TEXT NOT NULL DEFAULT '',"
+         " matched_keywords   TEXT NOT NULL DEFAULT '',"
+         " fit_rank           INTEGER NOT NULL DEFAULT 0,"
+         " spotted_at         INTEGER,"
+         " corrected_by       TEXT NOT NULL DEFAULT '',"
+         " amended_at         INTEGER NOT NULL DEFAULT 0,"
+         " amended_version    INTEGER NOT NULL DEFAULT -1,"
+         " award_publication_number TEXT NOT NULL DEFAULT '',"
+         " award_published_at INTEGER NOT NULL DEFAULT 0,"
+         " dismissed_by       TEXT NOT NULL DEFAULT '',"
+         " dismissed_at       INTEGER NOT NULL DEFAULT 0,"
+         " PRIMARY KEY (realm, tender_id))",
+         "CREATE INDEX IF NOT EXISTS tenders_by_morning"
+         " ON tenders (realm, published_at DESC, fit_rank DESC)"]}].
 
 -spec start_link(string()) -> {ok, pid()} | {error, term()}.
 start_link(SqlitePath) ->
@@ -117,7 +131,7 @@ init(SqlitePath) ->
     ok = filelib:ensure_dir(SqlitePath),
     opened(esqlite3:open(SqlitePath)).
 
-opened({ok, Conn}) -> schemed(Conn, create_schema(Conn, pragmas() ++ schema()));
+opened({ok, Conn}) -> schemed(Conn, migrated(Conn, create_schema(Conn, pragmas() ++ schema())));
 opened({error, Reason}) -> {stop, {open_failed, Reason}}.
 
 schemed(Conn, ok) -> {ok, #state{conn = Conn}};
@@ -176,6 +190,32 @@ create_schema(_Conn, []) -> ok.
 
 next_ddl(ok, Conn, Rest) -> create_schema(Conn, Rest);
 next_ddl({error, _} = E, _Conn, _Rest) -> E.
+
+%% Each migration above the file's user_version, in order, one transaction
+%% each: its statements and the version it brings the file to, or none of it.
+migrated(Conn, ok) -> migrate(Conn, user_version(Conn), migrations());
+migrated(_Conn, {error, _} = E) -> E.
+
+user_version(Conn) ->
+    [[Version]] = esqlite3:q(Conn, "PRAGMA user_version"),
+    Version.
+
+migrate(Conn, At, [{Version, _Statements} | Rest]) when Version =< At ->
+    migrate(Conn, At, Rest);
+migrate(Conn, _At, [{Version, Statements} | Rest]) ->
+    stepped(esqlite3:exec(Conn, transaction(Version, Statements)), Conn, Version, Rest);
+migrate(_Conn, _At, []) ->
+    ok.
+
+transaction(Version, Statements) ->
+    lists:flatten(["BEGIN; ", [[S, "; "] || S <- Statements],
+                   io_lib:format("PRAGMA user_version = ~b; COMMIT;", [Version])]).
+
+stepped(ok, Conn, Version, Rest) ->
+    migrate(Conn, Version, Rest);
+stepped({error, _} = E, Conn, _Version, _Rest) ->
+    _ = esqlite3:exec(Conn, "ROLLBACK"),
+    E.
 
 written([]) -> ok;
 written({error, _} = E) -> E;

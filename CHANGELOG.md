@@ -5,9 +5,9 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
-Refs macula-services/mcl-tenders#2, #3 and #4.
+Refs macula-services/mcl-tenders#4 and #11.
 
 - **The morning list** (#4, first step). Each reported contract notice or
   prior information notice that fits the realm's profile gets a dossier
@@ -21,6 +21,31 @@ Refs macula-services/mcl-tenders#2, #3 and #4.
   `MCL_TENDERS_DAILY_CAP` (500) tenders are spotted a day; `/health` info shows
   `intake`, `sensor` and `quiet`. The process manager is not yet subscribed to
   the sensor's facts: that waits for mcl_om 1.7.0 (macula-services/mcl-om#48).
+- **The realm can archive its profile** (`archive_tender_profile`, a sealed
+  procedure for the tenders role, like the other two). The realm stops looking
+  for public tenders: `get_tender_profile` answers `archived`, the sensor idles
+  and asks TED nothing, and the profile is not described or archived again
+  (`archived`, `already_archived`). The caller is recorded as `archived_by`.
+  A boot after the archive starts as before and leaves the profile archived.
+- **The read model moves forward in place.** A box that ran 0.1.0 keeps its
+  `tenders.sqlite3`: at boot the store applies each schema step above the
+  file's `PRAGMA user_version`, in a transaction, and a second boot changes
+  nothing. This release adds `archived_at` and `archived_by`.
+
+## [0.1.1] - 2026-11-02
+
+Refs macula-services/mcl-tenders#12.
+
+- **The release assembles.** v0.1.0's image was never built: `rebar3 as prod
+  release` refused `sense_ted_notices`, a name both `sense_tender_notices` and
+  `mcl_tenders` declared as theirs. It is the sensor app's alone now. 0.1.1 is
+  0.1.0 as it was meant to ship.
+- CI assembles the prod release on every change, so a release relx refuses
+  fails the pull request, not the tag.
+
+## [0.1.0] - 2026-11-02
+
+Refs macula-services/mcl-tenders#2 and #3.
 
 - **The sensor joins the release** (`sense_tender_notices`, under
   `mcl_tenders_sup`; the separate sensor app is gone). Each sweep reads the

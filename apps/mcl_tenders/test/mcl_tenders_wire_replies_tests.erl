@@ -31,6 +31,7 @@
 replies() ->
     [{<<"describe_tender_profile">>, {[], []}},
      {<<"get_tender_profile">>,      {?PROFILE, []}},
+     {<<"archive_tender_profile">>,  {[], []}},
      {<<"get_tenders_page">>,        {[<<"tenders">>], []}},
      {<<"get_tender_by_id">>,        {?DOSSIER, []}},
      {<<"dismiss_tender">>,          {[], []}}].
@@ -63,7 +64,8 @@ every_refusal_and_every_success_conforms() ->
                 call(<<"describe_tender_profile">>, #{countries => [{text, <<"be">>}]}, ?MEMBER),
                 call(<<"get_tenders_page">>, #{limit => 0}, ?MEMBER),
                 call(<<"get_tender_by_id">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
-                call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER)],
+                call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                call(<<"archive_tender_profile">>, #{}, ?MEMBER)],
     [?assertMatch({_, [<<"reason">>], {text, _}},
                   {Name, maps:keys(Reply), maps:get(<<"reason">>, Reply)})
      || {Name, Reply} <- Refusals],
@@ -86,7 +88,9 @@ every_refusal_and_every_success_conforms() ->
     ?assertEqual(summary_keys(), lists:sort(maps:keys(Entry))),
     Successes = [Described, call(<<"get_tender_profile">>, #{}, ?MEMBER), Listed,
                  call(<<"get_tender_by_id">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
-                 call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER)],
+                 call(<<"dismiss_tender">>, #{tender_id => {text, ?TENDER}}, ?MEMBER),
+                 %% Last, because archived is terminal.
+                 call(<<"archive_tender_profile">>, #{}, ?MEMBER)],
     [?assertEqual({Name, conforms}, {Name, conforms(Name, Reply)}) || {Name, Reply} <- Successes],
     ?assertEqual(lists:sort(proplists:get_keys(replies())),
                  lists:usort([Name || {Name, _} <- Successes])),

@@ -231,22 +231,22 @@ def containers():
 def components():
     d = Diagram("c4-components.svg", "mcl-tenders components: the profile, the sensor and the morning list", 1500, 1260)
     d.box("b-per", 50, 30, 300, 120, "Tenders role holder", "[Person or agent of the realm]",
-          ["Describes or reads the profile;", "lists, reads and dismisses tenders,", "through sealed calls"], person=True)
+          ["Describes, reads or archives the profile;", "lists, reads and dismisses tenders,", "through sealed calls"], person=True)
     d.box("b-mac", 400, 30, 300, 120, "macula link", "[library, on this node]",
           ["Refuses a call in the clear, and", "a caller without the tenders role,", "before any handler runs"])
     d.box("b-mac", 750, 30, 300, 120, "macula-realm", "[Macula infrastructure]",
           ["Mints the tenders role and", "anchors the realm's identity"])
     d.bound(30, 190, 1440, 860, "mcl-tenders [one release]: the profile, the sensor and the morning list", bottom=True)
-    d.box("b-cmp", 50, 230, 300, 150, "describe_tender_profile_responder", "[guide_tender_lifecycle]",
-          ["Checks every field: CPV codes,", "countries, keywords, exclusions,", "a description. The caller is",
-           "the one who described it."], code=True)
+    d.box("b-cmp", 50, 230, 300, 150, "describe_ and archive_ responders", "[guide_tender_lifecycle]",
+          ["describe checks every field; archive", "ends the realm's search, for good.", "Each records the caller as who",
+           "described or archived it."], code=True)
     d.box("b-sys", 400, 230, 300, 150, "mcl_tenders_service", "[mcl_om service contract]",
-          ["Announces its five procedures,", "sealed, for the tenders role only.", "At boot, initiates the realm's",
+          ["Announces its six procedures,", "sealed, for the tenders role only.", "At boot, initiates the realm's",
            "profile once. /health: intake, quiet."], code=True)
     d.box("b-cmp", 750, 230, 300, 150, "get_tender_profile_responder", "[query_tenders]",
           ["Answers the realm's profile,", "or a reason. Never the profile", "of another realm."], code=True)
     d.box("b-cmp", 50, 430, 300, 150, "tender_profile_aggregate", "[guide_tender_lifecycle, CMD]",
-          ["maybe_initiate_tender_profile and", "maybe_describe_tender_profile. One", "dossier per realm; its state holds",
+          ["maybe_initiate_, maybe_describe_,", "maybe_archive_tender_profile. One", "dossier per realm; its state holds",
            "flags only, never the profile."], code=True)
     d.box("b-cmp", 400, 430, 300, 150, "*_to_tender_profiles", "[project_tenders, PRJ]",
           ["One projection per event, through", "tenders_read_model_store, which", "keeps no argument in a crash",
@@ -283,7 +283,7 @@ def components():
     d.edge("M1250 430V150"); d.text("t-rel", 1258, 290, "days, CPV codes,"); d.text("t-rel", 1258, 306, "countries")
     d.edge("M1250 580V630"); d.text("t-rel", 1258, 610, "pulls the group key")
     d.edge("M750 90H700"); d.text("t-rel", 725, 82, "role", anchor="middle")
-    d.edge("M450 150V205H200V230"); d.text("t-rel", 208, 200, "describe_tender_profile")
+    d.edge("M450 150V205H200V230"); d.text("t-rel", 208, 200, "describe_ / archive_tender_profile")
     d.edge("M650 150V205H900V230"); d.text("t-rel", 892, 200, "get_tender_profile", anchor="end")
     d.edge("M200 380V430"); d.text("t-rel", 208, 410, "command")
     d.edge("M550 380V405H300V430"); d.text("t-rel", 558, 400, "initiates at boot")

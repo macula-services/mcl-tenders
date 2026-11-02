@@ -225,9 +225,16 @@ every_selected_column_is_in_the_schema_test() ->
                                    {get_tender_profile, "tender_profiles",
                                     get_tender_profile:columns()}]].
 
+%% A table's columns, as the schema creates it and every migration since adds
+%% to it: what a box has after its boot, whichever release it started on.
 table_columns(Table) ->
-    [Create] = [S || S <- tenders_read_model_store:schema(),
+    Statements = tenders_read_model_store:schema()
+        ++ lists:append([S || {_Version, S} <- tenders_read_model_store:migrations()]),
+    [Create] = [S || S <- Statements,
                      string:prefix(S, "CREATE TABLE IF NOT EXISTS " ++ Table ++ " (") =/= nomatch],
     {match, Names} = re:run(Create, "[(,] *([a-z_]+) +(?:TEXT|INTEGER)",
                            [global, {capture, all_but_first, list}]),
-    lists:append(Names).
+    Added = [Column || S <- Statements,
+                       {match, [Column]} <- [re:run(S, "^ALTER TABLE " ++ Table ++ " ADD COLUMN ([a-z_]+) ",
+                                                    [{capture, all_but_first, list}])]],
+    lists:append(Names) ++ Added.
